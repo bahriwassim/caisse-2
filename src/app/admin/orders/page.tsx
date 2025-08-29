@@ -37,6 +37,9 @@ export default function OrdersPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const { toast } = useToast();
   const notificationsRef = useRef(notificationsEnabled);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('disconnected');
+  const [eventCount, setEventCount] = useState<number>(0);
+  const [lastPayload, setLastPayload] = useState<any>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -89,6 +92,13 @@ export default function OrdersPage() {
     const channel = supabase
       .channel('realtime-orders-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        try {
+          setEventCount((c) => c + 1);
+          setLastPayload(payload);
+          setSubscriptionStatus('received-event');
+        } catch (e) {
+          console.error('Error updating realtime debug state', e);
+        }
         fetchOrders();
 
         // If notifications are disabled, bail out early
@@ -125,8 +135,12 @@ export default function OrdersPage() {
       })
       .subscribe();
 
+    // mark connected after subscribe returns
+    setSubscriptionStatus('subscribed');
+
     return () => {
       supabase.removeChannel(channel);
+  setSubscriptionStatus('disconnected');
     };
   }, []);
 
@@ -338,6 +352,15 @@ export default function OrdersPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Actualiser
               </Button>
+              <Button onClick={() => {
+                showNotification('Test', 'Ceci est une notification de test');
+              }} variant="ghost" size="sm">
+                Test notification
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                <div>Sub: {subscriptionStatus}</div>
+                <div>Events: {eventCount}</div>
+              </div>
             </div>
           </div>
           
