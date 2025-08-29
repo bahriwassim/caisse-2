@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         table_id: parseInt(tableId, 10),
         total,
         status: 'awaiting_payment',
-        payment_method: 'Carte de crédit',
+        payment_method: 'Stripe',
         short_id: orderShortId,
       })
       .select()
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
        await supabase.from('orders').update({ stripe_session_id: session.id }).eq('id', orderId);
     }
 
-    return NextResponse.json({ sessionId: session.id });
+    return NextResponse.json({ sessionId: session.id, orderId });
   } catch (error: any) {
     console.error('Erreur Stripe:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -269,7 +269,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         <>
             <PageHeader />
             <Tabs defaultValue={menu[0]?.id || 'entrees'} className="w-full">
-                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-4">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-8">
                 {menu.map((category) => (
                     <TabsTrigger key={category.id} value={category.id}>
                     {category.name}
@@ -277,7 +277,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
                 ))}
                 </TabsList>
                 {menu.map((category) => (
-                <TabsContent key={category.id} value={category.id}>
+                <TabsContent key={category.id} value={category.id} className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {category.items.map((item) => (
                         <MenuItemCard key={item.id} item={item} onAddToCart={addToCart} />

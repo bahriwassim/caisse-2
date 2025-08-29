@@ -174,10 +174,10 @@ export default function PosCartSheet({
                 size="lg"
                 className="w-full"
                 disabled={cart.length === 0}
-                onClick={() => handleCheckout("Carte de crédit")}
+                onClick={() => handleCheckout("Stripe")}
               >
                 <PackageCheck className="mr-2 h-5 w-5" />
-                Payé par Carte
+                Payé par Stripe
               </Button>
             </SheetClose>
             <SheetClose asChild>
