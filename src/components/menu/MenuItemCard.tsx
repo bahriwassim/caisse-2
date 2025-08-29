@@ -21,51 +21,12 @@ interface MenuItemCardProps {
 export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
   const isOutOfStock = item.status === "out_of_stock";
 
-  // Images plus réalistes pour chaque catégorie
-  const getRealisticImage = (itemName: string, category: string) => {
-    const name = itemName.toLowerCase();
-    
-    // Images réalistes pour les entrées
-    if (category === 'entrees') {
-      if (name.includes('salade') || name.includes('salade')) return '/images/entrees/salade.jpg';
-      if (name.includes('soupe') || name.includes('velouté')) return '/images/entrees/soupe.jpg';
-      if (name.includes('terrine') || name.includes('pâté')) return '/images/entrees/terrine.jpg';
-      if (name.includes('foie') || name.includes('gras')) return '/images/entrees/foie-gras.jpg';
-      return '/images/entrees/entree-generique.jpg';
-    }
-    
-    // Images réalistes pour les plats
-    if (category === 'plats') {
-      if (name.includes('steak') || name.includes('bœuf')) return '/images/plats/steak.jpg';
-      if (name.includes('poulet') || name.includes('volaille')) return '/images/plats/poulet.jpg';
-      if (name.includes('poisson') || name.includes('saumon')) return '/images/plats/poisson.jpg';
-      if (name.includes('agneau') || name.includes('mouton')) return '/images/plats/agneau.jpg';
-      if (name.includes('pasta') || name.includes('pâtes')) return '/images/plats/pasta.jpg';
-      return '/images/plats/plat-generique.jpg';
-    }
-    
-    // Images réalistes pour les desserts
-    if (category === 'desserts') {
-      if (name.includes('chocolat') || name.includes('mousse')) return '/images/desserts/chocolat.jpg';
-      if (name.includes('tarte') || name.includes('tarte')) return '/images/desserts/tarte.jpg';
-      if (name.includes('crème') || name.includes('brûlée')) return '/images/desserts/creme-brulee.jpg';
-      if (name.includes('fruit') || name.includes('fruit')) return '/images/desserts/fruit.jpg';
-      return '/images/desserts/dessert-generique.jpg';
-    }
-    
-    // Images réalistes pour les boissons
-    if (category === 'boissons') {
-      if (name.includes('vin') || name.includes('rouge')) return '/images/boissons/vin-rouge.jpg';
-      if (name.includes('champagne') || name.includes('mousseux')) return '/images/boissons/champagne.jpg';
-      if (name.includes('cocktail') || name.includes('mojito')) return '/images/boissons/cocktail.jpg';
-      if (name.includes('café') || name.includes('expresso')) return '/images/boissons/cafe.jpg';
-      return '/images/boissons/boisson-generique.jpg';
-    }
-    
-    return item.image || '/images/default-food.jpg';
+  // Utilise l'image Pizza-margherita.jpg pour tous les produits
+  const getProductImage = () => {
+    return '/images/Pizza-margherita.jpg';
   };
 
-  const imageUrl = getRealisticImage(item.name, item.category || 'plats');
+  const imageUrl = getProductImage();
 
   return (
     <Card className="group flex flex-col h-full overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white dark:bg-gray-900 rounded-xl">

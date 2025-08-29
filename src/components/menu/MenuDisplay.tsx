@@ -79,6 +79,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
 
     fetchOrder(currentOrderId);
 
+    // Real-time WebSocket avec Supabase
     const channel = supabase
       .channel(`order-updates-${currentOrderId}`)
       .on('postgres_changes', 
@@ -88,9 +89,15 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
           }
        )
       .subscribe();
+
+    // Polling de secours toutes les 8 secondes pour garantir l'actualisation
+    const pollingInterval = setInterval(() => {
+      fetchOrder(currentOrderId);
+    }, 8000);
       
     return () => {
         supabase.removeChannel(channel);
+        clearInterval(pollingInterval);
     }
 
   }, [currentOrderId, tableId]);
