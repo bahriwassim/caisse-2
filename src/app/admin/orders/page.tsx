@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,8 +36,9 @@ export default function OrdersPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const { toast } = useToast();
+  const notificationsRef = useRef(notificationsEnabled);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     const { data: active, error: activeError } = await supabase
       .from('orders')
@@ -60,7 +61,7 @@ export default function OrdersPage() {
       setLastUpdate(new Date());
     }
     setLoading(false);
-  };
+  }, [toast]);
 
   const showNotification = (title: string, body: string) => {
     if (!notificationsEnabled) return;
@@ -76,37 +77,43 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
-    // Demander la permission pour les notifications
+    // Demander la permission pour les notifications seulement si nécessaire (on mount)
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+      // don't force the prompt if user hasn't enabled notifications yet
     }
 
     fetchOrders();
 
-    const channel = supabase.channel('realtime-orders-page')
+  // keep a mutable ref updated via effect below
+
+    const channel = supabase
+      .channel('realtime-orders-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         fetchOrders();
-        
+
+        // If notifications are disabled, bail out early
+        if (!notificationsRef.current) return;
+
         // Notifications pour les changements de statut
         if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
           const oldOrder = payload.old as Order;
           const newOrder = payload.new as Order;
-          
+
           if (oldOrder.status !== newOrder.status) {
             const statusMessages = {
-              'awaiting_payment': 'En attente de paiement',
-              'in_preparation': 'En préparation',
-              'delivered': 'Livrée',
-              'cancelled': 'Annulée'
-            };
-            
+              awaiting_payment: 'En attente de paiement',
+              in_preparation: 'En préparation',
+              delivered: 'Livrée',
+              cancelled: 'Annulée',
+            } as Record<string, string>;
+
             showNotification(
               `Commande ${newOrder.short_id || newOrder.id.substring(0, 6)} mise à jour`,
               `Statut changé de "${statusMessages[oldOrder.status]}" à "${statusMessages[newOrder.status]}"`
             );
           }
         }
-        
+
         // Notifications pour les nouvelles commandes
         if (payload.eventType === 'INSERT') {
           const newOrder = payload.new as Order;
@@ -125,14 +132,28 @@ export default function OrdersPage() {
 
   // Auto-refresh toutes les 30 secondes si activé
   useEffect(() => {
-    if (!autoRefresh) return;
-    
+  if (!autoRefresh) return;
+
     const interval = setInterval(() => {
       fetchOrders();
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [autoRefresh]);
+
+  // Keep a ref-like current value of notificationsEnabled and request permission when toggled on
+  useEffect(() => {
+    if (notificationsEnabled && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, [notificationsEnabled]);
+
+  // keep notificationsRef up to date for realtime callbacks
+  useEffect(() => {
+    notificationsRef.current = notificationsEnabled;
+  }, [notificationsEnabled]);
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
     const { error } = await supabase
