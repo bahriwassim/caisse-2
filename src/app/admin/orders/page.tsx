@@ -99,38 +99,69 @@ export default function OrdersPage() {
         } catch (e) {
           console.error('Error updating realtime debug state', e);
         }
-        fetchOrders();
 
-        // If notifications are disabled, bail out early
-        if (!notificationsRef.current) return;
+        // Apply change locally for real-time UX
+        const event = payload.eventType;
+        const newRec = payload.new as Order | null;
+        const oldRec = payload.old as Order | null;
 
-        // Notifications pour les changements de statut
-        if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
-          const oldOrder = payload.old as Order;
-          const newOrder = payload.new as Order;
+        if (event === 'INSERT' && newRec) {
+          // insert into correct list
+          if (newRec.status === 'awaiting_payment' || newRec.status === 'in_preparation') {
+            setActiveOrders((prev) => [newRec, ...prev]);
+          } else {
+            setCompletedOrders((prev) => [newRec, ...prev]);
+          }
+          setLastUpdate(new Date());
 
-          if (oldOrder.status !== newOrder.status) {
-            const statusMessages = {
-              awaiting_payment: 'En attente de paiement',
-              in_preparation: 'En préparation',
-              delivered: 'Livrée',
-              cancelled: 'Annulée',
-            } as Record<string, string>;
-
+          if (notificationsRef.current) {
             showNotification(
-              `Commande ${newOrder.short_id || newOrder.id.substring(0, 6)} mise à jour`,
-              `Statut changé de "${statusMessages[oldOrder.status]}" à "${statusMessages[newOrder.status]}"`
+              'Nouvelle commande reçue',
+              `Commande ${newRec.short_id || newRec.id.substring(0, 6)} de la table ${newRec.table_id}`
             );
           }
         }
 
-        // Notifications pour les nouvelles commandes
-        if (payload.eventType === 'INSERT') {
-          const newOrder = payload.new as Order;
-          showNotification(
-            'Nouvelle commande reçue',
-            `Commande ${newOrder.short_id || newOrder.id.substring(0, 6)} de la table ${newOrder.table_id}`
-          );
+        if (event === 'UPDATE' && newRec && oldRec) {
+          // update existing order in place or move between lists if status changed
+          const wasActive = oldRec.status === 'awaiting_payment' || oldRec.status === 'in_preparation';
+          const isActive = newRec.status === 'awaiting_payment' || newRec.status === 'in_preparation';
+
+          // remove from previous list
+          if (wasActive && !isActive) {
+            setActiveOrders((prev) => prev.filter((o) => o.id !== newRec.id));
+            setCompletedOrders((prev) => [newRec, ...prev.filter((o) => o.id !== newRec.id)]);
+          } else if (!wasActive && isActive) {
+            setCompletedOrders((prev) => prev.filter((o) => o.id !== newRec.id));
+            setActiveOrders((prev) => [newRec, ...prev.filter((o) => o.id !== newRec.id)]);
+          } else {
+            // update in place
+            if (isActive) {
+              setActiveOrders((prev) => prev.map((o) => (o.id === newRec.id ? newRec : o)));
+            } else {
+              setCompletedOrders((prev) => prev.map((o) => (o.id === newRec.id ? newRec : o)));
+            }
+          }
+          setLastUpdate(new Date());
+
+          if (notificationsRef.current && oldRec.status !== newRec.status) {
+            const statusMessages: Record<string, string> = {
+              awaiting_payment: 'En attente de paiement',
+              in_preparation: 'En préparation',
+              delivered: 'Livrée',
+              cancelled: 'Annulée',
+            };
+            showNotification(
+              `Commande ${newRec.short_id || newRec.id.substring(0, 6)} mise à jour`,
+              `Statut changé de "${statusMessages[oldRec.status]}" à "${statusMessages[newRec.status]}"`
+            );
+          }
+        }
+
+        if (event === 'DELETE' && oldRec) {
+          setActiveOrders((prev) => prev.filter((o) => o.id !== oldRec.id));
+          setCompletedOrders((prev) => prev.filter((o) => o.id !== oldRec.id));
+          setLastUpdate(new Date());
         }
       })
       .subscribe();
@@ -351,11 +382,6 @@ export default function OrdersPage() {
               <Button onClick={fetchOrders} variant="outline" size="sm">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Actualiser
-              </Button>
-              <Button onClick={() => {
-                showNotification('Test', 'Ceci est une notification de test');
-              }} variant="ghost" size="sm">
-                Test notification
               </Button>
               <div className="text-sm text-muted-foreground">
                 <div>Sub: {subscriptionStatus}</div>
