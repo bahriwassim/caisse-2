@@ -20,13 +20,20 @@ import {
   Bell,
   BellOff,
   Settings,
-  RefreshCw
+  RefreshCw,
+  Filter,
+  Search
 } from "lucide-react";
+import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import type { OrderStatus, Order, PaymentMethod, FullOrder, OrderItem } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
+import { useGlobalRefreshPause } from "@/hooks/use-global-refresh-pause";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseISO } from 'date-fns';
+import { InvoiceGenerator } from "@/components/admin/InvoiceGenerator";
 
 export default function OrdersPage() {
   const [activeOrders, setActiveOrders] = useState<FullOrder[]>([]);
@@ -37,13 +44,16 @@ export default function OrdersPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const { toast } = useToast();
+  const enhancedToast = useEnhancedToast();
+  const { isPaused: isGlobalRefreshPaused } = useGlobalRefreshPause();
   const notificationsRef = useRef(notificationsEnabled);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('disconnected');
   const [eventCount, setEventCount] = useState<number>(0);
   const [lastPayload, setLastPayload] = useState<any>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const [originalTitle, setOriginalTitle] = useState<string>('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -73,80 +83,15 @@ export default function OrdersPage() {
 
     if (activeError || completedError) {
       console.error("Error fetching orders:", activeError || completedError);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les commandes." });
+      enhancedToast.error("Erreur", "Impossible de charger les commandes.");
     } else {
       setActiveOrders(active || []);
       setCompletedOrders(completed || []);
       setLastUpdate(new Date());
     }
     setLoading(false);
-  }, [toast]);
+  }, [enhancedToast]);
 
-  const showNotification = (title: string, body: string, isUrgent = false) => {
-    if (!notificationsEnabled) return;
-    
-    // Son de notification
-    try {
-      const audio = new Audio('/notification.mp3');
-      audio.volume = isUrgent ? 0.8 : 0.5;
-      audio.play().catch(() => {
-        // Si le son ne peut pas être joué, utiliser un bip système
-        if ('speechSynthesis' in window) {
-          speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-        }
-      });
-    } catch (e) {
-      console.log('Impossible de jouer le son de notification');
-    }
-    
-    // Notification browser
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification(title, { 
-        body,
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        tag: 'order-update',
-        requireInteraction: isUrgent,
-        silent: false
-      });
-      
-      // Auto-close after 5 seconds if not urgent
-      if (!isUrgent) {
-        setTimeout(() => notification.close(), 5000);
-      }
-    }
-    
-    // Toast notification
-    toast({
-      title,
-      description: body,
-      duration: isUrgent ? 10000 : 5000,
-    });
-    
-    // Faire clignoter l'onglet si la page n'est pas visible
-    if (document.hidden) {
-      let originalTitle = document.title;
-      let blinkCount = 0;
-      const blinkInterval = setInterval(() => {
-        document.title = blinkCount % 2 === 0 ? '🔔 ' + originalTitle : originalTitle;
-        blinkCount++;
-        if (blinkCount >= 6) {
-          document.title = originalTitle;
-          clearInterval(blinkInterval);
-        }
-      }, 500);
-      
-      // Arrêter le clignotement quand la page redevient visible
-      const handleVisibilityChange = () => {
-        if (!document.hidden) {
-          document.title = originalTitle;
-          clearInterval(blinkInterval);
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-        }
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-  };
 
   useEffect(() => {
     // Sauvegarder le titre original
@@ -177,13 +122,34 @@ export default function OrdersPage() {
         const newRec = payload.new as FullOrder | null;
         const oldRec = payload.old as FullOrder | null;
         
-        // Pour les INSERT et UPDATE, on doit refetch pour obtenir les détails complets
-        if (event === 'INSERT' || event === 'UPDATE') {
-          fetchOrders();
-          return;
-        }
-
         if (event === 'INSERT' && newRec) {
+          // Pour les INSERT, on fait le refetch après avoir géré les notifications
+          fetchOrders();
+          
+          // Notification pour nouvelle commande
+          if (notificationsRef.current) {
+            enhancedToast.success(
+              '🛎️ Nouvelle commande reçue',
+              `Commande #${newRec.short_id || newRec.id.substring(0, 6)} - Table ${newRec.table_id} - ${newRec.customer} - ${newRec.total?.toFixed(2) || '0.00'}€`,
+              { 
+                position: 'top-right',
+                duration: 8000,
+                blink: true,
+                playSound: true
+              }
+            );
+            
+            // Notification native du navigateur si permission accordée
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Nouvelle commande reçue', {
+                body: `Table ${newRec.table_id} - ${newRec.customer} - ${newRec.total?.toFixed(2) || '0.00'}€`,
+                icon: '/favicon.ico',
+                tag: `order-${newRec.id}`,
+                requireInteraction: true
+              });
+            }
+          }
+          
           // Marquer comme nouvelle commande pour mise en évidence visuelle
           setNewOrderIds(prev => new Set([...prev, newRec.id]));
           
@@ -196,49 +162,18 @@ export default function OrdersPage() {
             });
           }, 10000);
           
-          // insert into correct list
-          if (newRec.status === 'awaiting_payment' || newRec.status === 'in_preparation') {
-            setActiveOrders((prev) => [newRec, ...prev]);
-          } else {
-            setCompletedOrders((prev) => [newRec, ...prev]);
-          }
           setLastUpdate(new Date());
-
-          if (notificationsRef.current) {
-            showNotification(
-              '🛎️ Nouvelle commande reçue',
-              `Commande #${newRec.short_id || newRec.id.substring(0, 6)} - Table ${newRec.table_id} - ${newRec.customer} - ${newRec.total.toFixed(2)}€`,
-              true // Nouvelle commande = urgent
-            );
-          }
+          return;
         }
 
-        if (event === 'UPDATE' && newRec && oldRec) {
-          // update existing order in place or move between lists if status changed
-          const wasActive = oldRec.status === 'awaiting_payment' || oldRec.status === 'in_preparation';
-          const isActive = newRec.status === 'awaiting_payment' || newRec.status === 'in_preparation';
-
-          // remove from previous list
-          if (wasActive && !isActive) {
-            setActiveOrders((prev) => prev.filter((o) => o.id !== newRec.id));
-            setCompletedOrders((prev) => [newRec, ...prev.filter((o) => o.id !== newRec.id)]);
-          } else if (!wasActive && isActive) {
-            setCompletedOrders((prev) => prev.filter((o) => o.id !== newRec.id));
-            setActiveOrders((prev) => [newRec, ...prev.filter((o) => o.id !== newRec.id)]);
-          } else {
-            // update in place
-            if (isActive) {
-              setActiveOrders((prev) => prev.map((o) => (o.id === newRec.id ? newRec : o)));
-            } else {
-              setCompletedOrders((prev) => prev.map((o) => (o.id === newRec.id ? newRec : o)));
-            }
-          }
-          setLastUpdate(new Date());
-
-          if (notificationsRef.current && oldRec.status !== newRec.status) {
+        if (event === 'UPDATE' && newRec) {
+          // Pour les UPDATE, on fait le refetch pour obtenir les détails complets
+          fetchOrders();
+          
+          if (notificationsRef.current && oldRec && oldRec.status !== newRec.status) {
             const statusMessages: Record<string, string> = {
               awaiting_payment: 'En attente de paiement',
-              in_preparation: 'En préparation',
+              in_preparation: 'En préparation', 
               delivered: 'Livrée',
               cancelled: 'Annulée',
             };
@@ -248,60 +183,90 @@ export default function OrdersPage() {
               delivered: '✅',
               cancelled: '❌',
             };
-            showNotification(
-              `${statusEmojis[newRec.status]} Commande #${newRec.short_id || newRec.id.substring(0, 6)} mise à jour`,
-              `Table ${newRec.table_id} - ${newRec.customer} - Statut: "${statusMessages[newRec.status]}"`
-            );
+            
+            const notificationTitle = `${statusEmojis[newRec.status]} Commande mise à jour`;
+            const notificationDesc = `#${newRec.short_id || newRec.id.substring(0, 6)} - Table ${newRec.table_id} - ${newRec.customer} - "${statusMessages[newRec.status]}"`;
+            
+            if (newRec.status === 'delivered') {
+              enhancedToast.success(notificationTitle, notificationDesc, {
+                position: 'top-right',
+                duration: 5000,
+                blink: false
+              });
+            } else if (newRec.status === 'cancelled') {
+              enhancedToast.warning(notificationTitle, notificationDesc, {
+                position: 'top-right',
+                duration: 6000,
+                blink: true
+              });
+            } else {
+              enhancedToast.info(notificationTitle, notificationDesc, {
+                position: 'top-right',
+                duration: 4000
+              });
+            }
           }
+          
+          setLastUpdate(new Date());
+          return;
         }
 
         if (event === 'DELETE' && oldRec) {
-          setActiveOrders((prev) => prev.filter((o) => o.id !== oldRec.id));
-          setCompletedOrders((prev) => prev.filter((o) => o.id !== oldRec.id));
+          fetchOrders(); // Refetch pour synchroniser
           setLastUpdate(new Date());
+          return;
         }
       })
-      .subscribe();
-
-    // mark connected after subscribe returns
-    setSubscriptionStatus('subscribed');
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setSubscriptionStatus('subscribed');
+        } else if (status === 'CHANNEL_ERROR') {
+          setSubscriptionStatus('error');
+          console.error('Erreur de subscription aux changements temps réel');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
       setSubscriptionStatus('disconnected');
-      // Restaurer le titre original
       if (originalTitle) {
         document.title = originalTitle;
       }
     };
-  }, []);
+  }, [fetchOrders, enhancedToast]);
 
-  // Auto-refresh toutes les 30 secondes si activé
   useEffect(() => {
-  if (!autoRefresh) return;
+    if (!autoRefresh || isGlobalRefreshPaused) return;
 
     const interval = setInterval(() => {
-      fetchOrders();
+      if (!isGlobalRefreshPaused) {
+        fetchOrders();
+      }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, isGlobalRefreshPaused, fetchOrders]);
 
-  // Keep a ref-like current value of notificationsEnabled and request permission when toggled on
   useEffect(() => {
     if (notificationsEnabled && 'Notification' in window) {
       if (Notification.permission === 'default') {
-        Notification.requestPermission();
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            enhancedToast.success(
+              "Notifications activées", 
+              "Vous recevrez des notifications pour les nouvelles commandes",
+              { duration: 3000 }
+            );
+          }
+        });
       }
     }
-  }, [notificationsEnabled]);
+  }, [notificationsEnabled, enhancedToast]);
 
-  // keep notificationsRef up to date for realtime callbacks
   useEffect(() => {
     notificationsRef.current = notificationsEnabled;
   }, [notificationsEnabled]);
   
-  // Mettre à jour le titre avec le nombre de commandes en attente
   useEffect(() => {
     if (originalTitle) {
       const pendingCount = activeOrders.length;
@@ -321,22 +286,62 @@ export default function OrdersPage() {
 
     if (error) {
       console.error("Erreur de mise à jour du statut:", error);
-      toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de mettre à jour le statut de la commande.",
-      })
+      enhancedToast.error("Erreur", "Impossible de mettre à jour le statut de la commande.");
     } else {
-       toast({
-          title: "Statut mis à jour",
-          description: `La commande a été marquée comme "${status}".`,
-      })
+       enhancedToast.success("Statut mis à jour", `La commande a été marquée comme "${status}".`, { duration: 4000 });
     }
   };
 
   const handleViewDetails = (order: FullOrder) => {
     setSelectedOrder(order);
     setShowOrderDetails(true);
+  };
+
+  const filterOrdersByPayment = (orders: FullOrder[]) => {
+    if (paymentMethodFilter === 'all') {
+      return orders;
+    }
+    return orders.filter(order => order.payment_method === paymentMethodFilter);
+  };
+
+  const filterOrdersBySearch = (orders: FullOrder[]) => {
+    if (!searchQuery.trim()) {
+      return orders;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return orders.filter(order => {
+      // Search by order number
+      const orderNumber = order.short_id || order.id.substring(0, 6);
+      if (orderNumber.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search by customer name
+      if (order.customer.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search by price
+      if (order.total.toString().includes(query)) {
+        return true;
+      }
+      
+      // Search by product names in order items
+      if (order.order_items?.some(item => 
+        item.menu_item?.name.toLowerCase().includes(query)
+      )) {
+        return true;
+      }
+      
+      return false;
+    });
+  };
+
+  const getFilteredOrders = (orders: FullOrder[]) => {
+    let filtered = filterOrdersByPayment(orders);
+    filtered = filterOrdersBySearch(filtered);
+    return filtered;
   };
 
   const OrderDetailsModal = () => {
@@ -404,24 +409,45 @@ export default function OrdersPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-4">
-              {selectedOrder.status === 'awaiting_payment' && (
-                <Button onClick={() => handleUpdateStatus(selectedOrder.id, 'in_preparation')} className="flex-1">
-                  <CircleDollarSign className="mr-2 h-4 w-4" />
-                  Marquer comme Payée
-                </Button>
-              )}
-              {selectedOrder.status === 'in_preparation' && (
-                <Button onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')} className="flex-1">
-                  <Truck className="mr-2 h-4 w-4" />
-                  Marquer comme Livrée
-                </Button>
-              )}
-              {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
-                <Button variant="destructive" onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')} className="flex-1">
-                  <Ban className="mr-2 h-4 w-4" />
-                  Annuler
-                </Button>
+            <div className="space-y-3 pt-4">
+              <div className="flex gap-2">
+                {selectedOrder.status === 'awaiting_payment' && (
+                  <Button 
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'in_preparation')} 
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <CircleDollarSign className="mr-2 h-4 w-4" />
+                    Marquer comme Payée
+                  </Button>
+                )}
+                {selectedOrder.status === 'in_preparation' && (
+                  <Button 
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')} 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    Marquer comme Livrée
+                  </Button>
+                )}
+                {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')} 
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Annuler
+                  </Button>
+                )}
+              </div>
+
+              {/* Facturation Pro */}
+              {(selectedOrder.status === 'delivered' || selectedOrder.status === 'in_preparation') && (
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-center">
+                    <InvoiceGenerator order={selectedOrder} />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -431,55 +457,90 @@ export default function OrdersPage() {
   };
 
   const OrderTable = ({ orders }: { orders: FullOrder[] }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>ID Commande</TableHead>
-          <TableHead>Client</TableHead>
-          <TableHead>Articles</TableHead>
-          <TableHead>Statut</TableHead>
-          <TableHead>Paiement</TableHead>
-          <TableHead>Heure</TableHead>
-          <TableHead className="text-right">Total</TableHead>
-          <TableHead>
-            <span className="sr-only">Actions</span>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {orders.map((order) => (
-          <TableRow 
-            key={order.id} 
-            className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer transition-all duration-500 ${
-              newOrderIds.has(order.id) 
-                ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500 animate-pulse' 
-                : ''
-            }`} 
-            onClick={() => handleViewDetails(order)}
-          >
-            <TableCell className="font-medium">{order.short_id || order.id.substring(0, 6)}</TableCell>
-            <TableCell>
-              <div>{order.customer}</div>
-              {order.table_id > 0 && <div className="text-sm text-muted-foreground">Table {order.table_id}</div>}
-            </TableCell>
-            <TableCell>
-              <div className="text-sm">
-                {order.order_items?.length || 0} article(s)
-              </div>
-            </TableCell>
-            <TableCell>{getStatusBadge(order.status)}</TableCell>
-            <TableCell>{getPaymentBadge(order.payment_method)}</TableCell>
-            <TableCell>{order.created_at ? parseISO(order.created_at).toLocaleTimeString('fr-FR') : 'N/A'}</TableCell>
-            <TableCell className="text-right font-semibold">{order.total.toFixed(2)} €</TableCell>
-            <TableCell className="text-right">
-              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleViewDetails(order); }}>
-                Voir détails
-              </Button>
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table className="min-w-[800px]">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">ID</TableHead>
+            <TableHead className="w-[120px]">Client</TableHead>
+            <TableHead className="w-[80px] hidden sm:table-cell">Articles</TableHead>
+            <TableHead className="w-[120px]">Statut</TableHead>
+            <TableHead className="w-[100px] hidden md:table-cell">Paiement</TableHead>
+            <TableHead className="w-[80px] hidden lg:table-cell">Heure</TableHead>
+            <TableHead className="w-[80px] text-right">Total</TableHead>
+            <TableHead className="w-[160px] sm:w-[200px]">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow 
+              key={order.id} 
+              className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer transition-all duration-500 ${
+                newOrderIds.has(order.id) 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500 animate-pulse' 
+                  : ''
+              }`} 
+              onClick={() => handleViewDetails(order)}
+            >
+              <TableCell className="font-medium text-xs sm:text-sm">
+                {order.short_id || order.id.substring(0, 6)}
+              </TableCell>
+              <TableCell>
+                <div className="text-xs sm:text-sm font-medium">{order.customer}</div>
+                {order.table_id > 0 && <div className="text-xs text-muted-foreground">Table {order.table_id}</div>}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                <div className="text-xs">
+                  {order.order_items?.length || 0} art.
+                </div>
+              </TableCell>
+              <TableCell>{getStatusBadge(order.status)}</TableCell>
+              <TableCell className="hidden md:table-cell">{getPaymentBadge(order.payment_method)}</TableCell>
+              <TableCell className="hidden lg:table-cell text-xs">
+                {order.created_at ? parseISO(order.created_at).toLocaleTimeString('fr-FR') : 'N/A'}
+              </TableCell>
+              <TableCell className="text-right font-semibold text-xs sm:text-sm">
+                {order.total.toFixed(2)} €
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-1 justify-end flex-wrap">
+                  {order.status === 'awaiting_payment' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'in_preparation'); }}
+                      className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 text-xs h-7 px-2"
+                    >
+                      <CircleDollarSign className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Payée</span>
+                    </Button>
+                  )}
+                  {order.status === 'in_preparation' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'delivered'); }}
+                      className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 text-xs h-7 px-2"
+                    >
+                      <Truck className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Livrée</span>
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={(e) => { e.stopPropagation(); handleViewDetails(order); }}
+                    className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 text-xs h-7 px-2"
+                  >
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -533,92 +594,155 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       <Card className="border-0 shadow-lg">
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Truck className="h-6 w-6 text-primary" />
+        <CardHeader className="space-y-3 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
+                <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
-              <div>
-                <CardTitle className="text-2xl">Gestion des Commandes</CardTitle>
-                <CardDescription className="text-base">Suivez et gérez les commandes des clients en temps réel.</CardDescription>
+              <div className="flex-1">
+                <div className="flex items-center justify-between sm:block">
+                  <CardTitle className="text-lg sm:text-xl lg:text-2xl">Gestion des Commandes</CardTitle>
+                  <MobileThemeToggle />
+                </div>
+                <CardDescription className="text-xs sm:text-sm lg:text-base hidden sm:block">
+                  Suivez et gérez les commandes des clients en temps réel.
+                </CardDescription>
               </div>
             </div>
             
             {/* Contrôles de notification et rafraîchissement */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="notifications"
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
-                />
-                <Label htmlFor="notifications" className="flex items-center gap-2 text-sm">
-                  {notificationsEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-                  Notifications
-                </Label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center justify-between sm:justify-start gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="notifications"
+                    checked={notificationsEnabled}
+                    onCheckedChange={setNotificationsEnabled}
+                  />
+                  <Label htmlFor="notifications" className="flex items-center gap-2 text-sm">
+                    {notificationsEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+                    <span className="hidden sm:inline">Notifications</span>
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="auto-refresh"
+                    checked={autoRefresh}
+                    onCheckedChange={setAutoRefresh}
+                  />
+                  <Label htmlFor="auto-refresh" className="flex items-center gap-2 text-sm">
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="hidden sm:inline">Auto-refresh</span>
+                  </Label>
+                </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="auto-refresh"
-                  checked={autoRefresh}
-                  onCheckedChange={setAutoRefresh}
-                />
-                <Label htmlFor="auto-refresh" className="flex items-center gap-2 text-sm">
-                  <RefreshCw className="h-4 w-4" />
-                  Auto-refresh
-                </Label>
-              </div>
-              
-              <Button onClick={fetchOrders} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Actualiser
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                <div>Sub: {subscriptionStatus}</div>
-                <div>Events: {eventCount}</div>
+              <div className="flex items-center gap-2">
+                <Button onClick={fetchOrders} variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Actualiser</span>
+                </Button>
+                <div className="text-xs text-muted-foreground hidden lg:block">
+                  <div>Sub: {subscriptionStatus}</div>
+                  <div>Events: {eventCount}</div>
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Informations de mise à jour */}
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <span>Commandes actives: {activeOrders.length}</span>
-              <span>Commandes terminées: {completedOrders.length}</span>
+          {/* Recherche et Filtres */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {/* Barre de recherche */}
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full sm:w-[200px] lg:w-[300px]"
+                />
+              </div>
+              
+              {/* Filtre par paiement */}
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Label htmlFor="payment-filter" className="text-sm font-medium hidden sm:block">
+                  Paiement:
+                </Label>
+                <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+                  <SelectTrigger id="payment-filter" className="w-[120px] sm:w-[150px]">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="Stripe">Stripe</SelectItem>
+                    <SelectItem value="Espèces">Espèces</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <span>Dernière mise à jour: {lastUpdate.toLocaleTimeString('fr-FR')}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground text-center lg:text-right">
+              Mise à jour: {lastUpdate.toLocaleTimeString('fr-FR')}
+            </span>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+            <span>Actives: {getFilteredOrders(activeOrders).length}/{activeOrders.length}</span>
+            <span>Terminées: {getFilteredOrders(completedOrders).length}/{completedOrders.length}</span>
           </div>
         </CardHeader>
         
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           <Tabs defaultValue="active">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="active" className="flex items-center gap-2">
-                Commandes Actives ({activeOrders.length})
-                {activeOrders.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {activeOrders.length}
-                  </Badge>
-                )}
+            <TabsList className="grid w-full grid-cols-2 h-auto">
+              <TabsTrigger value="active" className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 px-2 sm:px-4">
+                <span className="text-xs sm:text-sm font-medium">
+                  <span className="hidden sm:inline">Commandes Actives</span>
+                  <span className="sm:hidden">Actives</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">({getFilteredOrders(activeOrders).length})</span>
+                  {getFilteredOrders(activeOrders).length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-4 px-1">
+                      {getFilteredOrders(activeOrders).length}
+                    </Badge>
+                  )}
+                </div>
               </TabsTrigger>
-              <TabsTrigger value="completed" className="flex items-center gap-2">
-                Historique ({completedOrders.length})
-                {completedOrders.length > 0 && (
-                  <Badge variant="outline" className="ml-1">
-                    {completedOrders.length}
-                  </Badge>
-                )}
+              <TabsTrigger value="completed" className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 px-2 sm:px-4">
+                <span className="text-xs sm:text-sm font-medium">
+                  <span className="hidden sm:inline">Historique</span>
+                  <span className="sm:hidden">Terminées</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">({getFilteredOrders(completedOrders).length})</span>
+                  {getFilteredOrders(completedOrders).length > 0 && (
+                    <Badge variant="outline" className="text-xs h-4 px-1">
+                      {getFilteredOrders(completedOrders).length}
+                    </Badge>
+                  )}
+                </div>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-6">
-              <RenderContent orders={activeOrders} emptyMessage="Aucune commande active pour le moment."/>
+              <RenderContent orders={getFilteredOrders(activeOrders)} emptyMessage={
+                searchQuery || paymentMethodFilter !== 'all' 
+                  ? "Aucune commande active ne correspond à vos critères de recherche." 
+                  : "Aucune commande active pour le moment."
+              }/>
             </TabsContent>
             <TabsContent value="completed" className="mt-6">
-              <RenderContent orders={completedOrders} emptyMessage="Aucune commande dans l'historique."/>
+              <RenderContent orders={getFilteredOrders(completedOrders)} emptyMessage={
+                searchQuery || paymentMethodFilter !== 'all'
+                  ? "Aucune commande terminée ne correspond à vos critères de recherche."
+                  : "Aucune commande dans l'historique."
+              }/>
             </TabsContent>
           </Tabs>
         </CardContent>

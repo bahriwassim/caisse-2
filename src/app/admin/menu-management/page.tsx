@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlusCircle, MoreHorizontal, FilePenLine, Trash2, Loader2 } from "lucide-react";
+import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -123,20 +124,27 @@ export default function MenuManagementPage() {
 
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-            <div>
-                <CardTitle className="font-headline text-2xl">Gestion du Menu</CardTitle>
-                <CardDescription>Ajoutez, modifiez ou supprimez des articles de votre menu. Les changements sont visibles en temps réel.</CardDescription>
-            </div>
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogTrigger asChild>
-                    <Button onClick={handleAddItem}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Ajouter un plat
-                    </Button>
-                </DialogTrigger>
+    <div className="space-y-4 p-4 sm:p-6">
+      <Card>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="flex-1">
+                  <div className="flex items-center justify-between sm:block">
+                    <CardTitle className="font-headline text-xl sm:text-2xl">Gestion du Menu</CardTitle>
+                    <MobileThemeToggle />
+                  </div>
+                  <CardDescription className="text-sm sm:text-base hidden sm:block">
+                    Ajoutez, modifiez ou supprimez des articles de votre menu. Les changements sont visibles en temps réel.
+                  </CardDescription>
+              </div>
+              <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                  <DialogTrigger asChild>
+                      <Button onClick={handleAddItem} className="w-full sm:w-auto">
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          <span className="hidden sm:inline">Ajouter un plat</span>
+                          <span className="sm:hidden">Ajouter</span>
+                      </Button>
+                  </DialogTrigger>
                 <DialogContent>
                      <DialogHeader>
                         <DialogTitle>{editingItem ? "Modifier le plat" : "Ajouter un nouveau plat"}</DialogTitle>
@@ -162,72 +170,88 @@ export default function MenuManagementPage() {
                 <p className="text-sm">Cliquez sur "Ajouter un plat" pour commencer.</p>
             </div>
         ) : (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Plat</TableHead>
-                        <TableHead>Catégorie</TableHead>
-                        <TableHead>Statut</TableHead>
-                        <TableHead className="text-right">Prix</TableHead>
-                        <TableHead>
-                            <span className="sr-only">Actions</span>
-                        </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {menuItems.map((item) => (
-                        <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.category}</TableCell>
-                            <TableCell>
-                                <Badge variant={item.status === 'available' ? 'default' : 'destructive'}>
-                                    {item.status === 'available' ? 'Disponible' : 'En rupture'}
-                                </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">{item.price.toFixed(2)} €</TableCell>
-                            <TableCell className="text-right">
-                                <AlertDialog>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                                <span className="sr-only">Toggle menu</span>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => handleEditItem(item)}>
-                                                <FilePenLine className="mr-2 h-4 w-4" />
-                                                Modifier
-                                            </DropdownMenuItem>
-                                            <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive">
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Supprimer
-                                                </DropdownMenuItem>
-                                            </AlertDialogTrigger>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Cette action est irréversible. Le plat sera définitivement supprimé.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteItem(item.id)}>Supprimer</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[600px]">
+                  <TableHeader>
+                      <TableRow>
+                          <TableHead>Plat</TableHead>
+                          <TableHead className="hidden sm:table-cell">Catégorie</TableHead>
+                          <TableHead>Statut</TableHead>
+                          <TableHead className="text-right">Prix</TableHead>
+                          <TableHead className="w-[70px]">
+                              <span className="sr-only">Actions</span>
+                          </TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {menuItems.map((item) => (
+                          <TableRow key={item.id}>
+                              <TableCell className="font-medium">
+                                <div>
+                                  <div className="font-semibold text-sm sm:text-base">{item.name}</div>
+                                  <div className="text-xs text-muted-foreground sm:hidden">{item.category}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-sm">{item.category}</TableCell>
+                              <TableCell>
+                                  <Badge 
+                                    variant={item.status === 'available' ? 'default' : 'destructive'}
+                                    className="text-xs"
+                                  >
+                                      <span className="hidden sm:inline">
+                                        {item.status === 'available' ? 'Disponible' : 'En rupture'}
+                                      </span>
+                                      <span className="sm:hidden">
+                                        {item.status === 'available' ? '✓' : '✗'}
+                                      </span>
+                                  </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-sm">{item.price.toFixed(2)} €</TableCell>
+                              <TableCell className="text-right">
+                                  <AlertDialog>
+                                      <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                              <Button aria-haspopup="true" size="icon" variant="ghost" className="h-8 w-8">
+                                                  <MoreHorizontal className="h-4 w-4" />
+                                                  <span className="sr-only">Toggle menu</span>
+                                              </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                              <DropdownMenuItem onClick={() => handleEditItem(item)}>
+                                                  <FilePenLine className="mr-2 h-4 w-4" />
+                                                  Modifier
+                                              </DropdownMenuItem>
+                                              <AlertDialogTrigger asChild>
+                                                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                                      <Trash2 className="mr-2 h-4 w-4" />
+                                                      Supprimer
+                                                  </DropdownMenuItem>
+                                              </AlertDialogTrigger>
+                                          </DropdownMenuContent>
+                                      </DropdownMenu>
+                                      <AlertDialogContent className="w-[90vw] max-w-md">
+                                          <AlertDialogHeader>
+                                          <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                              Cette action est irréversible. Le plat sera définitivement supprimé.
+                                          </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                                          <AlertDialogCancel className="w-full sm:w-auto">Annuler</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteItem(item.id)} className="w-full sm:w-auto">Supprimer</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                  </AlertDialog>
+                              </TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+            </div>
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

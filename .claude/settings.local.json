@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Read(D:\\/**)"
+      "Read(D:\\/**)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx supabase:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)",
+      "Bash(node:*)",
+      "Bash(del test-api.mjs)"
     ],
     "deny": [],
     "ask": []

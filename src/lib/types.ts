@@ -23,3 +23,10 @@ export type PaymentMethod = "Stripe" | "Espèces";
 export type FullOrder = Order & {
     order_items: OrderItem[]
 };
+
+export type Invoice = Database['public']['Tables']['invoices']['Row'];
+export type InvoiceStatus = "draft" | "sent" | "paid";
+
+export type FullInvoice = Invoice & {
+    order: FullOrder;
+};

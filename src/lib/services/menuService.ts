@@ -16,7 +16,7 @@ export const seedDatabaseIfNeeded = async () => {
                 price: 15,
                 category: "Bols",
                 status: "available",
-                image: "https://picsum.photos/600/400",
+                image: "/images/jamaican-poke-bowl-08-683x1024.jpg",
                 aiHint: "jamaican food"
             },
             {

@@ -3,13 +3,15 @@
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AdminHeader from "@/components/layout/AdminHeader";
-import { QrCode, ClipboardList, Utensils, LayoutDashboard, ShoppingCart } from "lucide-react";
+import { QrCode, ClipboardList, Utensils, LayoutDashboard, ShoppingCart, FileText, LogOut, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
+import { AdminLoginDialog } from "@/components/auth/AdminLoginDialog";
 
 export default function AdminLayout({
   children,
@@ -17,6 +19,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const { toast } = useToast();
+  const { isAuthenticated, showLogin, login, logout, isLoading } = useAdminAuth();
 
   useEffect(() => {
     const channel = supabase.channel('realtime-orders-toast')
@@ -42,6 +45,34 @@ export default function AdminLayout({
       supabase.removeChannel(channel);
     };
   }, [toast]);
+
+  // Affichage du loader pendant la vérification
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Vérification des permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Affichage du dialog de connexion si non authentifié
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <div className="text-6xl mb-4">🔒</div>
+            <h1 className="text-2xl font-bold">Interface Administration</h1>
+            <p className="text-muted-foreground">Authentification requise pour accéder</p>
+          </div>
+        </div>
+        <AdminLoginDialog open={showLogin} onLogin={login} />
+      </>
+    );
+  }
 
 
   return (
@@ -70,10 +101,24 @@ export default function AdminLayout({
                 <ClipboardList />
                 <span>Commandes</span>
               </Link>
+              <Link href="/admin/invoices" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
+                <FileText />
+                <span>Facturation Pro</span>
+              </Link>
               <Link href="/admin/qr-generator" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <QrCode />
                 <span>Générateur de QR</span>
               </Link>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Déconnexion</span>
+              </Button>
             </nav>
           </div>
         </header>

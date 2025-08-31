@@ -8,13 +8,18 @@ import MenuItemCard from "./MenuItemCard";
 import CartSheet from "../cart/CartSheet";
 import PosCartSheet from "../cart/PosCartSheet";
 import { useToast } from "@/hooks/use-toast";
+import { useState as useNotificationState } from "react";
+import type { POSNotification } from "@/components/pos/POSNotifications";
+import POSNotifications from "@/components/pos/POSNotifications";
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { supabase } from "@/lib/supabase";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Loader2, CheckCircle, Ban } from "lucide-react";
+import { Loader2, CheckCircle, Ban, AlertTriangle, Clock } from "lucide-react";
+import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Separator } from "../ui/separator";
 import { parseISO } from 'date-fns';
+import { StableInvoiceRequest } from "@/components/client/StableInvoiceRequest";
 
 interface MenuDisplayProps {
   menu: MenuCategory[];
@@ -27,6 +32,9 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<FullOrder | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState(true);
+  const [posNotifications, setPosNotifications] = useNotificationState<POSNotification[]>([]);
+  const [systemStatus, setSystemStatus] = useState({ ordersEnabled: true, pausedReason: '' });
+  const [isRefreshPaused, setIsRefreshPaused] = useState(false);
   const { toast } = useToast();
 
   const fetchOrder = async (orderId: string) => {
@@ -61,6 +69,28 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
      setIsLoadingOrder(false);
   }
 
+  // Check system status for customer-facing pages
+  useEffect(() => {
+    if (!isPosMode) {
+      const checkSystemStatus = async () => {
+        try {
+          const response = await fetch('/api/system/status');
+          if (response.ok) {
+            const status = await response.json();
+            setSystemStatus(status);
+          }
+        } catch (error) {
+          console.error('Error checking system status:', error);
+        }
+      };
+
+      checkSystemStatus();
+      // Check status every 15 seconds for customer pages
+      const interval = setInterval(checkSystemStatus, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isPosMode]);
+
   useEffect(() => {
     const storedOrderId = localStorage.getItem(`orderId_table_${tableId}`);
     if (storedOrderId) {
@@ -91,8 +121,11 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
       .subscribe();
 
     // Polling de secours toutes les 8 secondes pour garantir l'actualisation
+    // Sauf si explicitement mis en pause
     const pollingInterval = setInterval(() => {
-      fetchOrder(currentOrderId);
+      if (!isRefreshPaused) {
+        fetchOrder(currentOrderId);
+      }
     }, 8000);
       
     return () => {
@@ -100,7 +133,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         clearInterval(pollingInterval);
     }
 
-  }, [currentOrderId, tableId]);
+  }, [currentOrderId, tableId, isRefreshPaused]);
 
   const handleOrderPlaced = (orderId: string) => {
     localStorage.setItem(`orderId_table_${tableId}`, orderId);
@@ -113,10 +146,17 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         localStorage.removeItem(`orderId_table_${tableId}`);
         setCurrentOrderId(null);
         setCurrentOrder(null);
-        toast({
-            title: "Prêt pour une nouvelle commande",
-            description: "Vous pouvez maintenant passer une nouvelle commande.",
-        });
+        // POS notification on left side if in POS mode
+        if (isPosMode) {
+          const notification: POSNotification = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: "Nouvelle commande",
+            description: "Prêt pour une nouvelle commande",
+            type: 'info',
+            duration: 3000
+          };
+          setPosNotifications(prev => [...prev, notification]);
+        }
     }
   };
 
@@ -134,10 +174,17 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
       }
       return [...prevCart, { menuItem, quantity: 1 }];
     });
-    toast({
-      title: "Ajouté à la commande",
-      description: `${menuItem.name} a été ajouté.`,
-    });
+    // POS notification on left side if in POS mode
+    if (isPosMode) {
+      const notification: POSNotification = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: "Ajouté",
+        description: `${menuItem.name} ajouté à la commande`,
+        type: 'success',
+        duration: 2000
+      };
+      setPosNotifications(prev => [...prev, notification]);
+    }
   };
 
   const updateCartQuantity = (menuItemId: string, quantity: number) => {
@@ -220,7 +267,16 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
                         <p className="font-semibold text-green-700 dark:text-green-300">
                            {currentOrder.status === 'delivered' ? 'Votre commande a été livrée. Bon appétit !' : 'Votre commande a été annulée.'}
                         </p>
-                        <Button onClick={handleClearOrder} className="mt-3" size="sm">Passer une nouvelle commande</Button>
+                        <div className="flex gap-2 mt-3 justify-center flex-wrap">
+                          {currentOrder.status === 'delivered' && (
+                            <StableInvoiceRequest 
+                              order={currentOrder} 
+                              className="flex-shrink-0"
+                              onRefreshPauseChange={setIsRefreshPaused}
+                            />
+                          )}
+                          <Button onClick={handleClearOrder} size="sm">Passer une nouvelle commande</Button>
+                        </div>
                     </div>
                 )}
             </CardContent>
@@ -232,10 +288,13 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
     if (isPosMode) {
       return (
          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="font-headline text-2xl">Caisse</CardTitle>
-                <CardDescription>Créez une nouvelle commande pour un client au comptoir.</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between sm:block">
+                  <CardTitle className="font-headline text-xl sm:text-2xl">Caisse</CardTitle>
+                  <MobileThemeToggle />
+                </div>
+                <CardDescription className="text-sm sm:text-base">Créez une nouvelle commande pour un client au comptoir.</CardDescription>
               </div>
               <PosCartSheet cart={cart} updateCartQuantity={updateCartQuantity} clearCart={clearCart} />
             </div>
@@ -243,42 +302,98 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
       )
     }
     return (
-       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Menu</h1>
-          <p className="text-muted-foreground">Commande pour la Table {tableId}</p>
+       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 px-4 sm:px-0">
+        <div className="flex-1">
+          <div className="flex items-center justify-between sm:block">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold font-headline">Menu</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Table {tableId}</p>
+            </div>
+            <MobileThemeToggle />
+          </div>
         </div>
-        <CartSheet 
-            cart={cart} 
-            updateCartQuantity={updateCartQuantity} 
-            clearCart={clearCart} 
-            tableId={tableId}
-            onOrderPlaced={handleOrderPlaced}
-        />
+        <div className="w-full sm:w-auto">
+          <CartSheet 
+              cart={cart} 
+              updateCartQuantity={updateCartQuantity} 
+              clearCart={clearCart} 
+              tableId={tableId}
+              onOrderPlaced={handleOrderPlaced}
+          />
+        </div>
       </div>
     )
   }
   
   const showMenu = !currentOrder || currentOrder.status === 'delivered' || currentOrder.status === 'cancelled';
 
+  // System Status Banner for customers
+  const SystemStatusBanner = () => {
+    if (isPosMode || systemStatus.ordersEnabled) return null;
+
+    return (
+      <Card className="mb-6 border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="bg-orange-100 dark:bg-orange-800 p-3 rounded-full flex-shrink-0">
+              <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-200 mb-2">
+                ⏸️ Commandes temporairement suspendues
+              </h3>
+              <p className="text-orange-700 dark:text-orange-300 leading-relaxed">
+                {systemStatus.pausedReason}
+              </p>
+              <div className="flex items-center gap-2 mt-3 text-sm text-orange-600 dark:text-orange-400">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium">Nous reprendrons les commandes très bientôt ! Merci pour votre patience 🙏</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const handleCloseNotification = (id: string) => {
+    setPosNotifications(prev => prev.filter(notif => notif.id !== id));
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
+      {isPosMode && (
+        <POSNotifications 
+          notifications={posNotifications} 
+          onClose={handleCloseNotification} 
+        />
+      )}
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <SystemStatusBanner />
       {!isPosMode && <OrderStatusTracker />}
       
       {showMenu && (
         <>
             <PageHeader />
             <Tabs defaultValue={menu[0]?.id || 'entrees'} className="w-full">
-                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-8">
+                <TabsList className={`grid w-full gap-2 mb-6 sm:mb-8 ${
+                  menu.length <= 2 ? 'grid-cols-2' : 
+                  menu.length <= 3 ? 'grid-cols-1 sm:grid-cols-3' :
+                  'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                } h-auto p-1`}>
                 {menu.map((category) => (
-                    <TabsTrigger key={category.id} value={category.id}>
-                    {category.name}
+                    <TabsTrigger 
+                      key={category.id} 
+                      value={category.id}
+                      className="text-xs sm:text-sm py-2 px-2 sm:px-4 h-auto whitespace-nowrap"
+                    >
+                      {category.name}
                     </TabsTrigger>
                 ))}
                 </TabsList>
                 {menu.map((category) => (
-                <TabsContent key={category.id} value={category.id} className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <TabsContent key={category.id} value={category.id} className="mt-4 sm:mt-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {category.items.map((item) => (
                         <MenuItemCard key={item.id} item={item} onAddToCart={addToCart} />
                     ))}
@@ -288,6 +403,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
             </Tabs>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

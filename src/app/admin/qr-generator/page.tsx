@@ -14,14 +14,18 @@ import {
   Settings, 
   Table as TableIcon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Check
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Image from "next/image";
 
 interface QRCodeData {
   tableNumber: number;
   qrCodeUrl: string;
   url: string;
+  selected?: boolean;
 }
 
 export default function QrGeneratorPage() {
@@ -31,6 +35,8 @@ export default function QrGeneratorPage() {
   const [qrCodes, setQrCodes] = useState<QRCodeData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPreview, setCurrentPreview] = useState<number | null>(null);
+  const [selectedQrCodes, setSelectedQrCodes] = useState<Set<number>>(new Set());
+  const [qrCodesPerPage, setQrCodesPerPage] = useState(1);
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
@@ -54,6 +60,7 @@ export default function QrGeneratorPage() {
     }
     
     setQrCodes(newQrCodes);
+    setSelectedQrCodes(new Set());
     setIsGenerating(false);
   };
 
@@ -112,7 +119,7 @@ export default function QrGeneratorPage() {
             <div class="print-container">
               <div class="table-info">
                 <div class="table-number">Table ${tableNumber}</div>
-                <div class="table-subtitle">Scannez pour commander</div>
+                <div class="table-subtitle">Scanne-moi pour passer une commande</div>
               </div>
               <div class="qr-code">
                 <img src="${qrCode.qrCodeUrl}" alt="QR Code pour table ${tableNumber}" width="250" height="250" />
@@ -138,7 +145,7 @@ export default function QrGeneratorPage() {
         <div style="page-break-after: always; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif;">
           <div style="text-align: center; margin-bottom: 20px;">
             <div style="font-size: 3rem; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Table ${qr.tableNumber}</div>
-            <div style="font-size: 1.2rem; color: #6b7280; margin-bottom: 20px;">Scannez pour commander</div>
+            <div style="font-size: 1.2rem; color: #6b7280; margin-bottom: 20px;">Scanne-moi pour passer une commande</div>
           </div>
           <div style="border: 2px solid #e5e7eb; border-radius: 8px; padding: 20px; background: white;">
             <img src="${qr.qrCodeUrl}" alt="QR Code pour table ${qr.tableNumber}" width="250" height="250" />
@@ -169,11 +176,179 @@ export default function QrGeneratorPage() {
     }
   };
 
+  const toggleQrSelection = (tableNumber: number) => {
+    setSelectedQrCodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tableNumber)) {
+        newSet.delete(tableNumber);
+      } else {
+        newSet.add(tableNumber);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedQrCodes.size === qrCodes.length) {
+      setSelectedQrCodes(new Set());
+    } else {
+      setSelectedQrCodes(new Set(qrCodes.map(qr => qr.tableNumber)));
+    }
+  };
+
+  const generateMultiQrPageHtml = (qrCodesForPage: QRCodeData[]) => {
+    const gridClass = qrCodesPerPage === 1 ? 'single-qr' : 
+                     qrCodesPerPage === 2 ? 'double-qr' : 
+                     qrCodesPerPage === 4 ? 'quad-qr' : 
+                     qrCodesPerPage === 6 ? 'six-qr' : 'eight-qr';
+    
+    return `
+      <div class="page ${gridClass}">
+        ${qrCodesForPage.map(qr => `
+          <div class="qr-item">
+            <div class="table-info">
+              <div class="table-number">Table ${qr.tableNumber}</div>
+              <div class="table-subtitle">Scanne-moi pour passer une commande</div>
+            </div>
+            <div class="qr-code">
+              <img src="${qr.qrCodeUrl}" alt="QR Code pour table ${qr.tableNumber}" />
+            </div>
+            <div class="instructions">
+              Placez ce QR code sur votre table
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  const handlePrintSelected = () => {
+    const selectedCodes = qrCodes.filter(qr => selectedQrCodes.has(qr.tableNumber));
+    if (selectedCodes.length === 0) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const pages = [];
+      for (let i = 0; i < selectedCodes.length; i += qrCodesPerPage) {
+        const qrCodesForPage = selectedCodes.slice(i, i + qrCodesPerPage);
+        pages.push(generateMultiQrPageHtml(qrCodesForPage));
+      }
+      
+      const pagesHtml = pages.join('');
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>QR Codes Sélectionnés</title>
+            <style>
+              @media print {
+                body { margin: 0; }
+                .page { 
+                  width: 100vw; 
+                  height: 100vh; 
+                  display: grid;
+                  gap: 10px;
+                  padding: 20px;
+                  box-sizing: border-box;
+                  font-family: Arial, sans-serif;
+                  page-break-after: always;
+                }
+                .page:last-child {
+                  page-break-after: avoid;
+                }
+                .single-qr {
+                  grid-template-columns: 1fr;
+                  place-items: center;
+                }
+                .double-qr {
+                  grid-template-columns: 1fr 1fr;
+                  place-items: center;
+                }
+                .quad-qr {
+                  grid-template-columns: 1fr 1fr;
+                  grid-template-rows: 1fr 1fr;
+                  place-items: center;
+                }
+                .six-qr {
+                  grid-template-columns: 1fr 1fr;
+                  grid-template-rows: 1fr 1fr 1fr;
+                  place-items: center;
+                }
+                .eight-qr {
+                  grid-template-columns: 1fr 1fr 1fr 1fr;
+                  grid-template-rows: 1fr 1fr;
+                  place-items: center;
+                }
+                .qr-item {
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  text-align: center;
+                  max-width: 100%;
+                  max-height: 100%;
+                }
+                .table-info {
+                  margin-bottom: 8px;
+                }
+                .table-number {
+                  font-size: ${qrCodesPerPage === 1 ? '2.5rem' : qrCodesPerPage <= 4 ? '1.5rem' : '1.2rem'};
+                  font-weight: bold;
+                  color: #1f2937;
+                  margin-bottom: 4px;
+                }
+                .table-subtitle {
+                  font-size: ${qrCodesPerPage === 1 ? '1rem' : qrCodesPerPage <= 4 ? '0.8rem' : '0.6rem'};
+                  color: #6b7280;
+                  margin-bottom: 8px;
+                }
+                .qr-code {
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  padding: ${qrCodesPerPage === 1 ? '20px' : qrCodesPerPage <= 4 ? '10px' : '5px'};
+                  background: white;
+                  margin-bottom: 8px;
+                }
+                .qr-code img {
+                  width: ${qrCodesPerPage === 1 ? '250px' : qrCodesPerPage <= 4 ? '150px' : '100px'};
+                  height: ${qrCodesPerPage === 1 ? '250px' : qrCodesPerPage <= 4 ? '150px' : '100px'};
+                  display: block;
+                }
+                .instructions {
+                  font-size: ${qrCodesPerPage === 1 ? '0.9rem' : qrCodesPerPage <= 4 ? '0.7rem' : '0.5rem'};
+                  color: #6b7280;
+                  text-align: center;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${pagesHtml}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  const downloadSelectedQRCodes = () => {
+    const selectedCodes = qrCodes.filter(qr => selectedQrCodes.has(qr.tableNumber));
+    selectedCodes.forEach(qr => {
+      const link = document.createElement('a');
+      link.href = qr.qrCodeUrl;
+      link.download = `qr-code-table-${qr.tableNumber}-scanne-moi.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  };
+
   const downloadAllQRCodes = () => {
     qrCodes.forEach(qr => {
       const link = document.createElement('a');
       link.href = qr.qrCodeUrl;
-      link.download = `qr-code-table-${qr.tableNumber}.png`;
+      link.download = `qr-code-table-${qr.tableNumber}-scanne-moi.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -275,6 +450,49 @@ export default function QrGeneratorPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Télécharger tous les QR Codes
                   </Button>
+                  {selectedQrCodes.size > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="qr-per-page" className="text-sm font-medium">
+                          QR codes par page
+                        </Label>
+                        <Select
+                          value={qrCodesPerPage.toString()}
+                          onValueChange={(value) => setQrCodesPerPage(parseInt(value))}
+                        >
+                          <SelectTrigger id="qr-per-page" className="w-full">
+                            <SelectValue placeholder="Choisir..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 par page (Grand format)</SelectItem>
+                            <SelectItem value="2">2 par page</SelectItem>
+                            <SelectItem value="4">4 par page</SelectItem>
+                            <SelectItem value="6">6 par page</SelectItem>
+                            <SelectItem value="8">8 par page (Compact)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-xs text-muted-foreground text-center mb-2">
+                        {Math.ceil(selectedQrCodes.size / qrCodesPerPage)} page{Math.ceil(selectedQrCodes.size / qrCodesPerPage) > 1 ? 's' : ''} à imprimer
+                      </div>
+                      <Button 
+                        onClick={handlePrintSelected} 
+                        variant="default" 
+                        className="w-full"
+                      >
+                        <Printer className="mr-2 h-4 w-4" />
+                        Imprimer la sélection ({selectedQrCodes.size})
+                      </Button>
+                      <Button 
+                        onClick={downloadSelectedQRCodes} 
+                        variant="default" 
+                        className="w-full"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Télécharger la sélection ({selectedQrCodes.size})
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -285,7 +503,24 @@ export default function QrGeneratorPage() {
             <div className="space-y-4">
               <Separator />
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Aperçu des QR Codes</h3>
+                <div className="flex items-center gap-4">
+                  <h3 className="text-lg font-semibold">Aperçu des QR Codes</h3>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="select-all"
+                      checked={selectedQrCodes.size === qrCodes.length && qrCodes.length > 0}
+                      onCheckedChange={toggleAllSelection}
+                    />
+                    <Label htmlFor="select-all" className="text-sm font-medium">
+                      Tout sélectionner
+                    </Label>
+                    {selectedQrCodes.size > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {selectedQrCodes.size} sélectionné{selectedQrCodes.size > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -314,13 +549,27 @@ export default function QrGeneratorPage() {
                   <Card 
                     key={qr.tableNumber} 
                     className={`relative overflow-hidden border-2 transition-all duration-200 ${
-                      currentPreview === index ? 'border-primary shadow-lg' : 'border-gray-200 hover:border-gray-300'
+                      selectedQrCodes.has(qr.tableNumber) 
+                        ? 'border-primary bg-primary/5 shadow-lg' 
+                        : currentPreview === index 
+                        ? 'border-primary shadow-lg' 
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
+                    <div className="absolute top-2 right-2 z-10">
+                      <Checkbox
+                        checked={selectedQrCodes.has(qr.tableNumber)}
+                        onCheckedChange={() => toggleQrSelection(qr.tableNumber)}
+                        className="bg-white border-2 shadow-sm"
+                      />
+                    </div>
                     <CardHeader className="text-center pb-2">
                       <CardTitle className="text-xl text-primary">Table {qr.tableNumber}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-center space-y-3">
+                      <div className="text-sm text-muted-foreground font-medium">
+                        Scanne-moi pour passer une commande
+                      </div>
                       <div className="mx-auto w-48 h-48 relative">
                         <Image
                           src={qr.qrCodeUrl}

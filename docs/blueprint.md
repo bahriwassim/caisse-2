@@ -5,7 +5,7 @@
 - QR Code Menu Display: Display the restaurant's menu by scanning a QR code, directing customers to a specific table's digital menu.
 - Digital Menu Browsing: Browse the digital menu featuring categories, product names, descriptions, prices, and availability status (available/out of stock), with optional photos.
 - Table-Specific Ordering: Add items to a cart associated with the scanned QR code, for a table-specific ordering experience.
-- Order Numbering: Generate order numbers following the format: CMD-[Table Number]-[Sequential Number] (e.g., CMD-07-004).
+- Order Numbering: Generate order numbers following the format: TABLE-[Table Number]-[Sequential Number] (e.g., TABLE-07-004).
 - Menu Content Generation Tool: Suggest menu descriptions based on dish names and ingredients using a generative AI tool.  This simplifies the process of creating appealing menu descriptions.
 
 ## Style Guidelines:

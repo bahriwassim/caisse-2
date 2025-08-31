@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
     
      const randomOrderNum = Math.floor(Math.random() * 900) + 100;
-     const orderShortId = `CMD-${tableId}-${String(randomOrderNum).padStart(3, '0')}`;
+     const orderShortId = `TABLE-${tableId}-${String(randomOrderNum).padStart(3, '0')}`;
 
     // 1. Create order in Supabase
      const { data: orderData, error: orderError } = await supabase

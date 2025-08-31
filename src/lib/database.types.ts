@@ -88,12 +88,71 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          id: string
+          invoice_number: string
+          order_id: string
+          customer_name: string
+          customer_email: string | null
+          company_name: string | null
+          vat_number: string | null
+          subtotal_ht: number
+          tax_amount: number
+          total_ttc: number
+          tax_rate: number
+          created_at: string
+          sent_at: string | null
+          status: "draft" | "sent" | "paid"
+        }
+        Insert: {
+          id?: string
+          invoice_number: string
+          order_id: string
+          customer_name: string
+          customer_email?: string | null
+          company_name?: string | null
+          vat_number?: string | null
+          subtotal_ht: number
+          tax_amount: number
+          total_ttc: number
+          tax_rate: number
+          created_at?: string
+          sent_at?: string | null
+          status?: "draft" | "sent" | "paid"
+        }
+        Update: {
+          id?: string
+          invoice_number?: string
+          order_id?: string
+          customer_name?: string
+          customer_email?: string | null
+          company_name?: string | null
+          vat_number?: string | null
+          subtotal_ht?: number
+          tax_amount?: number
+          total_ttc?: number
+          tax_rate?: number
+          created_at?: string
+          sent_at?: string | null
+          status?: "draft" | "sent" | "paid"
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       orders: {
         Row: {
           created_at: string
           customer: string
           id: string
-          payment_method: "Carte de crédit" | "Espèces"
+          payment_method: "Stripe" | "Espèces"
           short_id: string | null
           status: "awaiting_payment" | "in_preparation" | "delivered" | "cancelled"
           stripe_session_id: string | null
@@ -104,7 +163,7 @@ export type Database = {
           created_at?: string
           customer: string
           id?: string
-          payment_method: "Carte de crédit" | "Espèces"
+          payment_method: "Stripe" | "Espèces"
           short_id?: string | null
           status?: "awaiting_payment" | "in_preparation" | "delivered" | "cancelled"
           stripe_session_id?: string | null

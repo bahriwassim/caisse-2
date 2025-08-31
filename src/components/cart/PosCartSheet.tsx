@@ -25,6 +25,9 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Separator } from "../ui/separator";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useState as useNotificationState } from "react";
+import type { POSNotification } from "@/components/pos/POSNotifications";
+import POSNotifications from "@/components/pos/POSNotifications";
 import { supabase } from "@/lib/supabase";
 
 interface PosCartSheetProps {
@@ -40,6 +43,7 @@ export default function PosCartSheet({
 }: PosCartSheetProps) {
   const [orderShortId, setOrderShortId] = useState("");
   const { toast } = useToast();
+  const [posNotifications, setPosNotifications] = useNotificationState<POSNotification[]>([]);
   
   useEffect(() => {
     // Generate a random order number for demo purposes
@@ -82,24 +86,42 @@ export default function PosCartSheet({
         const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
         if (itemsError) throw itemsError;
 
-        toast({
-            title: "Nouvelle commande créée !",
-            description: `La commande #${orderShortId} a été ajoutée à la liste.`,
-        });
+        // POS notification on left side
+        const newNotification: POSNotification = {
+          id: Math.random().toString(36).substr(2, 9),
+          title: "Commande créée !",
+          description: `Commande #${orderShortId} ajoutée à la liste`,
+          type: 'success',
+          duration: 5000
+        };
+        setPosNotifications(prev => [...prev, newNotification]);
         
         clearCart();
      } catch(e) {
         console.error("Error adding document: ", e);
-        toast({
-            variant: "destructive",
-            title: "Erreur",
-            description: "Impossible d'enregistrer la commande.",
-        });
+        // POS error notification on left side
+        const errorNotification: POSNotification = {
+          id: Math.random().toString(36).substr(2, 9),
+          title: "Erreur",
+          description: "Impossible d'enregistrer la commande",
+          type: 'warning',
+          duration: 6000
+        };
+        setPosNotifications(prev => [...prev, errorNotification]);
      }
   }
 
+  const handleCloseNotification = (id: string) => {
+    setPosNotifications(prev => prev.filter(notif => notif.id !== id));
+  };
+
   return (
-    <Sheet>
+    <>
+      <POSNotifications 
+        notifications={posNotifications} 
+        onClose={handleCloseNotification} 
+      />
+      <Sheet>
       <SheetTrigger asChild>
         <Button className="relative">
           <ShoppingCart className="mr-2 h-5 w-5" />
@@ -195,5 +217,6 @@ export default function PosCartSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+    </>
   );
 }

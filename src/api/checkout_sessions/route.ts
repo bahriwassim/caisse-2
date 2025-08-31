@@ -2,8 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import type { CartItem } from '@/lib/types';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2024-06-20',
