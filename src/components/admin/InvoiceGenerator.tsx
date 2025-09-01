@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Mail, Download, Calculator, Clock, Eye, CheckCircle } from "lucide-react";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import type { FullOrder, Invoice } from "@/lib/types";
@@ -27,12 +28,23 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
   const [isLoading, setIsLoading] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState<Invoice | null>(null);
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(null);
+  const [invoiceType, setInvoiceType] = useState<"detailed" | "simple">("detailed");
   const enhancedToast = useEnhancedToast();
 
   const TAX_RATE = 0.10;
+  const FISCAL_NUMBER = "FR123456789012"; // Remplacez par votre matricule fiscal
   const totalTTC = order.total;
   const subtotalHT = totalTTC / (1 + TAX_RATE);
   const taxAmount = totalTTC - subtotalHT;
+
+  // Calcul du nombre de repas pour facture simple
+  const calculateMeals = (total: number) => {
+    if (total <= 50) {
+      return { count: 1, description: "Repas" };
+    } else {
+      return { count: 2, description: "Repas" };
+    }
+  };
 
   // Fonction pour vérifier si une facture existe déjà
   const checkExistingInvoice = async () => {
@@ -48,6 +60,7 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
         setCustomerEmail(data.invoice.customer_email || "");
         setCompanyName(data.invoice.company_name || "");
         setVatNumber(data.invoice.vat_number || "");
+        setInvoiceType(data.invoice.invoice_type || "detailed");
       } else {
         setExistingInvoice(null);
         setGeneratedInvoice(null);
@@ -74,7 +87,8 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
           orderId: order.id,
           customerEmail: customerEmail || null,
           companyName: companyName || null,
-          vatNumber: vatNumber || null
+          vatNumber: vatNumber || null,
+          invoiceType: invoiceType
         })
       });
 
@@ -263,6 +277,27 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
               <CardTitle className="text-lg">Génération de facture</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoice-type">Type de facture</Label>
+                <Select 
+                  value={invoiceType} 
+                  onValueChange={(value: "detailed" | "simple") => setInvoiceType(value)}
+                  disabled={!!existingInvoice}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir le type de facture" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="detailed">
+                      Facture détaillée - Tous les articles
+                    </SelectItem>
+                    <SelectItem value="simple">
+                      Facture simple - {calculateMeals(totalTTC).count} repas (≤50€ = 1 repas, >50€ = 2 repas)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="customer-email">Email client</Label>

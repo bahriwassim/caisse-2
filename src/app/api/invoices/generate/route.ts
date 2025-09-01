@@ -14,7 +14,7 @@ try {
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderId, customerEmail, companyName, vatNumber } = await req.json();
+    const { orderId, customerEmail, companyName, vatNumber, invoiceType } = await req.json();
 
     if (!orderId) {
       return NextResponse.json({ error: 'ID de commande requis' }, { status: 400 });
@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
       tax_amount: Number(taxAmount.toFixed(2)),
       total_ttc: totalTTC,
       tax_rate: TAX_RATE,
+      invoice_type: invoiceType || 'detailed',
       created_at: new Date().toISOString(),
       sent_at: null,
       status: 'draft'

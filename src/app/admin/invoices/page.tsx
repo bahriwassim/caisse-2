@@ -133,6 +133,206 @@ export default function InvoicesPage() {
     }
   };
 
+  const downloadInvoicePDF = async (invoice: FullInvoice) => {
+    try {
+      // Générer le contenu HTML de la facture
+      const invoiceHtml = generateInvoiceHTML(invoice);
+      
+      // Créer un Blob avec le contenu HTML
+      const blob = new Blob([invoiceHtml], { type: 'text/html' });
+      
+      // Créer un lien de téléchargement
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Facture_${invoice.invoice_number}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Nettoyer l'URL
+      URL.revokeObjectURL(url);
+      
+      enhancedToast.success(
+        "Téléchargement réussi",
+        `Facture ${invoice.invoice_number} téléchargée`
+      );
+      
+    } catch (error: any) {
+      enhancedToast.error(
+        "Erreur de téléchargement",
+        error.message || "Impossible de télécharger la facture"
+      );
+    }
+  };
+
+  const generateInvoiceHTML = (invoice: FullInvoice) => {
+    const FISCAL_NUMBER = "FR123456789012";
+    const items = invoice.order?.order_items || [];
+    
+    // Calcul du nombre de repas pour facture simple
+    const calculateMeals = (total: number) => {
+      if (total <= 50) {
+        return { count: 1, description: "Repas" };
+      } else {
+        return { count: 2, description: "Repas" };
+      }
+    };
+    
+    const meals = calculateMeals(invoice.total_ttc);
+    const type = invoice.invoice_type || 'detailed';
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Facture ${invoice.invoice_number}</title>
+        <style>
+          @media print {
+            @page {
+              margin: 1cm;
+              size: A4;
+            }
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            line-height: 1.4;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+          }
+          .invoice-info { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 30px; 
+          }
+          .items-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 30px; 
+          }
+          .items-table th, .items-table td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+          }
+          .items-table th { 
+            background-color: #f8f9fa; 
+            font-weight: bold;
+          }
+          .totals { 
+            margin-left: auto; 
+            width: 300px; 
+            border: 1px solid #ddd;
+            padding: 15px;
+          }
+          .total-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 10px; 
+          }
+          .final-total { 
+            font-weight: bold; 
+            font-size: 1.2em; 
+            border-top: 2px solid #333; 
+            padding-top: 10px; 
+            margin-top: 10px;
+          }
+          .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>FACTURE</h1>
+          <h2>${invoice.invoice_number}</h2>
+          <p style="font-size: 14px; margin-top: 10px; color: #666;">Matricule Fiscal: ${FISCAL_NUMBER}</p>
+        </div>
+        
+        <div class="invoice-info">
+          <div>
+            <strong>Client:</strong><br>
+            ${invoice.customer_name}<br>
+            ${invoice.company_name ? `<strong>Société:</strong> ${invoice.company_name}<br>` : ''}
+            ${invoice.vat_number ? `<strong>N° TVA:</strong> ${invoice.vat_number}<br>` : ''}
+            ${invoice.order ? `Table ${invoice.order.table_id}` : ''}
+          </div>
+          <div>
+            <strong>Date:</strong> ${new Date(invoice.created_at).toLocaleDateString('fr-FR')}<br>
+            <strong>Commande:</strong> ${invoice.order?.short_id || invoice.order?.id?.substring(0, 6) || 'N/A'}<br>
+            ${invoice.customer_email ? `<strong>Email:</strong> ${invoice.customer_email}` : ''}
+          </div>
+        </div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Article</th>
+              <th>Prix unitaire HT</th>
+              <th>Quantité</th>
+              <th>Total HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${type === "simple" ? `
+              <tr>
+                <td>${meals.description}</td>
+                <td>${(invoice.subtotal_ht / meals.count).toFixed(2)} €</td>
+                <td>${meals.count}</td>
+                <td>${invoice.subtotal_ht.toFixed(2)} €</td>
+              </tr>
+            ` : items.map((item: any) => {
+              const priceHT = item.price / (1 + invoice.tax_rate);
+              const totalHT = priceHT * item.quantity;
+              return `
+                <tr>
+                  <td>${item.menu_item?.name || 'Article'}</td>
+                  <td>${priceHT.toFixed(2)} €</td>
+                  <td>${item.quantity}</td>
+                  <td>${totalHT.toFixed(2)} €</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div class="total-row">
+            <span>Sous-total HT:</span>
+            <span>${invoice.subtotal_ht.toFixed(2)} €</span>
+          </div>
+          <div class="total-row">
+            <span>TVA (${(invoice.tax_rate * 100).toFixed(0)}%):</span>
+            <span>${invoice.tax_amount.toFixed(2)} €</span>
+          </div>
+          <div class="total-row final-total">
+            <span>Total TTC:</span>
+            <span>${invoice.total_ttc.toFixed(2)} €</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>Merci pour votre visite !</strong></p>
+          <p>Cette facture a été générée automatiquement le ${new Date().toLocaleString('fr-FR')}.</p>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   const getStatusBadge = (status: InvoiceStatus) => {
     switch (status) {
       case "draft":
@@ -260,7 +460,11 @@ export default function InvoicesPage() {
                 <Mail className="mr-2 h-4 w-4" />
                 {selectedInvoice.status === 'sent' ? 'Renvoyer' : 'Envoyer'} par email
               </Button>
-              <Button variant="outline" className="flex-1">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => downloadInvoicePDF(selectedInvoice)}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Télécharger PDF
               </Button>

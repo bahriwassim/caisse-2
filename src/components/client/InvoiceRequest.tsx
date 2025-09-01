@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Mail, Clock, Building, Hash } from "lucide-react";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import type { Order } from "@/lib/types";
@@ -24,6 +25,7 @@ export function InvoiceRequest({ order, className, onDialogOpenChange }: Invoice
     companyName: '',
     vatNumber: ''
   });
+  const [invoiceType, setInvoiceType] = useState<"detailed" | "simple">("detailed");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogKey, setDialogKey] = useState(0); // Force re-render key
   const enhancedToast = useEnhancedToast();
@@ -78,7 +80,8 @@ export function InvoiceRequest({ order, className, onDialogOpenChange }: Invoice
           orderId: order.id,
           customerEmail: formData.email,
           companyName: formData.companyName || null,
-          vatNumber: formData.vatNumber || null
+          vatNumber: formData.vatNumber || null,
+          invoiceType: invoiceType
         })
       });
 
@@ -129,6 +132,17 @@ export function InvoiceRequest({ order, className, onDialogOpenChange }: Invoice
   const totalTTC = order.total;
   const subtotalHT = totalTTC / (1 + TAX_RATE);
   const taxAmount = totalTTC - subtotalHT;
+
+  // Calcul du nombre de repas pour facture simple
+  const calculateMeals = (total: number) => {
+    if (total <= 50) {
+      return { count: 1, description: "Repas" };
+    } else {
+      return { count: 2, description: "Repas" };
+    }
+  };
+
+  const meals = calculateMeals(totalTTC);
 
   const handleDialogOpenChange = (open: boolean) => {
     console.log('Dialog open change:', open, 'was open:', wasOpen);
@@ -215,6 +229,37 @@ export function InvoiceRequest({ order, className, onDialogOpenChange }: Invoice
                     <div className="font-bold text-base">{totalTTC.toFixed(2)} €</div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Type de facture */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Type de facture</CardTitle>
+              <CardDescription className="text-sm">
+                Choisissez le niveau de détail souhaité pour votre facture
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="invoice-type">Type de facture</Label>
+                <Select 
+                  value={invoiceType} 
+                  onValueChange={(value: "detailed" | "simple") => setInvoiceType(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir le type de facture" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="detailed">
+                      Facture détaillée - Tous les articles commandés
+                    </SelectItem>
+                    <SelectItem value="simple">
+                      Facture simple - {meals.count} repas (≤50€ = 1 repas, >50€ = 2 repas)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

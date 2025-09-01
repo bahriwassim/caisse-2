@@ -101,6 +101,7 @@ export type Database = {
           tax_amount: number
           total_ttc: number
           tax_rate: number
+          invoice_type: "detailed" | "simple"
           created_at: string
           sent_at: string | null
           status: "draft" | "sent" | "paid"
@@ -117,6 +118,7 @@ export type Database = {
           tax_amount: number
           total_ttc: number
           tax_rate: number
+          invoice_type?: "detailed" | "simple"
           created_at?: string
           sent_at?: string | null
           status?: "draft" | "sent" | "paid"
@@ -133,6 +135,7 @@ export type Database = {
           tax_amount?: number
           total_ttc?: number
           tax_rate?: number
+          invoice_type?: "detailed" | "simple"
           created_at?: string
           sent_at?: string | null
           status?: "draft" | "sent" | "paid"

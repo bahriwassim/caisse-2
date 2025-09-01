@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Mail, Clock, Building, Hash, Calculator, ArrowLeft } from "lucide-react";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +26,7 @@ export default function InvoiceRequestPage({ params }: InvoiceRequestPageProps) 
     companyName: '',
     vatNumber: ''
   });
+  const [invoiceType, setInvoiceType] = useState<"detailed" | "simple">("detailed");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const enhancedToast = useEnhancedToast();
 
@@ -99,7 +101,8 @@ export default function InvoiceRequestPage({ params }: InvoiceRequestPageProps) 
           orderId: order.id,
           customerEmail: formData.email,
           companyName: formData.companyName || null,
-          vatNumber: formData.vatNumber || null
+          vatNumber: formData.vatNumber || null,
+          invoiceType: invoiceType
         })
       });
 
@@ -193,6 +196,17 @@ export default function InvoiceRequestPage({ params }: InvoiceRequestPageProps) 
   const subtotalHT = totalTTC / (1 + TAX_RATE);
   const taxAmount = totalTTC - subtotalHT;
 
+  // Calcul du nombre de repas pour facture simple
+  const calculateMeals = (total: number) => {
+    if (total <= 50) {
+      return { count: 1, description: "Repas" };
+    } else {
+      return { count: 2, description: "Repas" };
+    }
+  };
+
+  const meals = calculateMeals(totalTTC);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -254,6 +268,37 @@ export default function InvoiceRequestPage({ params }: InvoiceRequestPageProps) 
                   <div className="font-bold text-lg">{totalTTC.toFixed(2)} €</div>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Type de facture */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Type de facture</CardTitle>
+            <CardDescription>
+              Choisissez le niveau de détail souhaité pour votre facture
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label htmlFor="invoice-type">Type de facture</Label>
+              <Select 
+                value={invoiceType} 
+                onValueChange={(value: "detailed" | "simple") => setInvoiceType(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir le type de facture" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="detailed">
+                    Facture détaillée - Tous les articles commandés
+                  </SelectItem>
+                  <SelectItem value="simple">
+                    Facture simple - {meals.count} repas (≤50€ = 1 repas, >50€ = 2 repas)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>

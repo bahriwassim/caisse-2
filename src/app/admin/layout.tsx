@@ -10,8 +10,10 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { AdminLoginDialog } from "@/components/auth/AdminLoginDialog";
+import { useActiveOrdersCount } from "@/hooks/use-active-orders-count";
 
 export default function AdminLayout({
   children,
@@ -20,6 +22,7 @@ export default function AdminLayout({
 }) {
   const { toast } = useToast();
   const { isAuthenticated, showLogin, login, logout, isLoading } = useAdminAuth();
+  const activeOrdersCount = useActiveOrdersCount();
 
   useEffect(() => {
     const channel = supabase.channel('realtime-orders-toast')
@@ -97,9 +100,17 @@ export default function AdminLayout({
                 <Utensils />
                 <span>Gestion du Menu</span>
               </Link>
-              <Link href="/admin/orders" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
+              <Link href="/admin/orders" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10 relative">
                 <ClipboardList />
                 <span>Commandes</span>
+                {activeOrdersCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs font-bold bg-red-500 text-white animate-pulse"
+                  >
+                    {activeOrdersCount}
+                  </Badge>
+                )}
               </Link>
               <Link href="/admin/invoices" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <FileText />

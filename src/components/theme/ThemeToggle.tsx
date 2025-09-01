@@ -12,32 +12,40 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+
+  const handleToggle = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="h-9 w-9">
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Changer le thème</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          <Sun className="mr-2 h-4 w-4" />
-          Clair
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          <Moon className="mr-2 h-4 w-4" />
-          Sombre
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          <Sun className="mr-2 h-4 w-4" />
-          Système
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="relative inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-1 transition-colors duration-300">
+      {/* Mode Jour */}
+      <button
+        onClick={() => setTheme("light")}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+          theme === "light" 
+            ? "bg-white text-gray-900 shadow-sm" 
+            : "text-gray-600 hover:text-gray-900"
+        }`}
+      >
+        <Sun className="h-4 w-4" />
+        Mode Jour
+      </button>
+      
+      {/* Mode Nuit */}
+      <button
+        onClick={() => setTheme("dark")}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+          theme === "dark" 
+            ? "bg-gray-900 text-white shadow-sm" 
+            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+        }`}
+      >
+        <Moon className="h-4 w-4" />
+        Mode Nuit
+      </button>
+    </div>
   );
 }
 
@@ -45,20 +53,33 @@ export function ThemeToggle() {
 export function MobileThemeToggle() {
   const { theme, setTheme } = useTheme();
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={toggleTheme}
-      className="h-8 w-8 p-0"
-    >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Changer le thème</span>
-    </Button>
+    <div className="relative inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-0.5 transition-colors duration-300">
+      {/* Mode Jour */}
+      <button
+        onClick={() => setTheme("light")}
+        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
+          theme === "light" 
+            ? "bg-white text-gray-900 shadow-sm" 
+            : "text-gray-600 hover:text-gray-900"
+        }`}
+      >
+        <Sun className="h-3 w-3" />
+        Jour
+      </button>
+      
+      {/* Mode Nuit */}
+      <button
+        onClick={() => setTheme("dark")}
+        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
+          theme === "dark" 
+            ? "bg-gray-900 text-white shadow-sm" 
+            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+        }`}
+      >
+        <Moon className="h-3 w-3" />
+        Nuit
+      </button>
+    </div>
   );
 }
