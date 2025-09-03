@@ -138,30 +138,34 @@ export default function InvoicesPage() {
       // Générer le contenu HTML de la facture
       const invoiceHtml = generateInvoiceHTML(invoice);
       
-      // Créer un Blob avec le contenu HTML
-      const blob = new Blob([invoiceHtml], { type: 'text/html' });
+      // Créer une nouvelle fenêtre avec le contenu de la facture
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Impossible d\'ouvrir la fenêtre d\'impression. Veuillez autoriser les pop-ups.');
+      }
       
-      // Créer un lien de téléchargement
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Facture_${invoice.invoice_number}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      printWindow.document.write(invoiceHtml);
+      printWindow.document.close();
       
-      // Nettoyer l'URL
-      URL.revokeObjectURL(url);
+      // Attendre que le contenu soit chargé puis déclencher l'impression PDF
+      printWindow.onload = () => {
+        // Petit délai pour s'assurer que le contenu est bien rendu
+        setTimeout(() => {
+          printWindow.print();
+          // La fenêtre se fermera automatiquement après l'impression
+        }, 500);
+      };
       
       enhancedToast.success(
-        "Téléchargement réussi",
-        `Facture ${invoice.invoice_number} téléchargée`
+        "PDF généré",
+        `La fenêtre d'impression PDF pour la facture ${invoice.invoice_number} s'ouvre`,
+        { duration: 6000 }
       );
       
     } catch (error: any) {
       enhancedToast.error(
-        "Erreur de téléchargement",
-        error.message || "Impossible de télécharger la facture"
+        "Erreur de téléchargement PDF",
+        error.message || "Impossible de générer le PDF"
       );
     }
   };
@@ -187,146 +191,174 @@ export default function InvoicesPage() {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Facture ${invoice.invoice_number}</title>
+        <title>Preuve de paiement - ${invoice.invoice_number}</title>
         <style>
           @media print {
             @page {
-              margin: 1cm;
-              size: A4;
+              margin: 0.5cm;
+              size: 80mm auto;
+            }
+            body {
+              -webkit-print-color-adjust: exact;
+              color-adjust: exact;
+              margin: 0;
+              padding: 0;
             }
           }
           body { 
-            font-family: Arial, sans-serif; 
-            max-width: 800px; 
+            font-family: 'Courier New', monospace; 
+            width: 300px;
             margin: 0 auto; 
-            padding: 20px; 
-            line-height: 1.4;
+            padding: 10px; 
+            line-height: 1.3;
+            font-size: 12px;
+            background: #fff;
           }
-          .header { 
+          .ticket-header { 
             text-align: center; 
-            margin-bottom: 30px; 
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
+            margin-bottom: 15px; 
+            border-bottom: 1px dashed #333;
+            padding-bottom: 10px;
           }
-          .invoice-info { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 30px; 
+          .ticket-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
           }
-          .items-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 30px; 
+          .ticket-info { 
+            text-align: center;
+            margin-bottom: 15px; 
+            font-size: 11px;
           }
-          .items-table th, .items-table td { 
-            border: 1px solid #ddd; 
-            padding: 12px; 
-            text-align: left; 
+          .customer-info {
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 10px;
           }
-          .items-table th { 
-            background-color: #f8f9fa; 
+          .items-section { 
+            margin-bottom: 15px; 
+          }
+          .item-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            align-items: flex-start;
+          }
+          .item-name {
+            flex: 1;
+            padding-right: 5px;
+            word-wrap: break-word;
+          }
+          .item-price {
+            white-space: nowrap;
             font-weight: bold;
           }
-          .totals { 
-            margin-left: auto; 
-            width: 300px; 
-            border: 1px solid #ddd;
-            padding: 15px;
+          .quantity-line {
+            font-size: 10px;
+            color: #666;
+            margin-left: 10px;
+            margin-bottom: 5px;
           }
-          .total-row { 
+          .totals-section { 
+            border-top: 1px dashed #333;
+            padding-top: 10px;
+            margin-bottom: 15px;
+          }
+          .total-line { 
             display: flex; 
             justify-content: space-between; 
-            margin-bottom: 10px; 
+            margin-bottom: 3px; 
+            font-size: 11px;
           }
           .final-total { 
             font-weight: bold; 
-            font-size: 1.2em; 
-            border-top: 2px solid #333; 
-            padding-top: 10px; 
-            margin-top: 10px;
+            font-size: 14px; 
+            border-top: 1px solid #333; 
+            padding-top: 5px; 
+            margin-top: 5px;
           }
           .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            font-size: 12px;
-            color: #666;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed #333;
+            font-size: 10px;
             text-align: center;
+            color: #666;
+          }
+          .separator {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 10px;
           }
         </style>
+        <script>
+          window.addEventListener('afterprint', function() {
+            window.close();
+          });
+        </script>
       </head>
       <body>
-        <div class="header">
-          <h1>FACTURE</h1>
-          <h2>${invoice.invoice_number}</h2>
-          <p style="font-size: 14px; margin-top: 10px; color: #666;">Matricule Fiscal: ${FISCAL_NUMBER}</p>
+        <div class="ticket-header">
+          <div class="ticket-title">PREUVE DE PAIEMENT</div>
+          <div>Ticket N° ${invoice.invoice_number}</div>
         </div>
         
-        <div class="invoice-info">
-          <div>
-            <strong>Client:</strong><br>
-            ${invoice.customer_name}<br>
-            ${invoice.company_name ? `<strong>Société:</strong> ${invoice.company_name}<br>` : ''}
-            ${invoice.vat_number ? `<strong>N° TVA:</strong> ${invoice.vat_number}<br>` : ''}
-            ${invoice.order ? `Table ${invoice.order.table_id}` : ''}
-          </div>
-          <div>
-            <strong>Date:</strong> ${new Date(invoice.created_at).toLocaleDateString('fr-FR')}<br>
-            <strong>Commande:</strong> ${invoice.order?.short_id || invoice.order?.id?.substring(0, 6) || 'N/A'}<br>
-            ${invoice.customer_email ? `<strong>Email:</strong> ${invoice.customer_email}` : ''}
-          </div>
+        <div class="ticket-info">
+          <div><strong>Date:</strong> ${new Date(invoice.created_at).toLocaleString('fr-FR')}</div>
+          <div><strong>Table:</strong> ${invoice.order?.table_id || 'N/A'}</div>
+          <div><strong>Commande:</strong> ${invoice.order?.short_id || invoice.order?.id?.substring(0, 6) || 'N/A'}</div>
+        </div>
+        
+        <div class="customer-info">
+          <div><strong>Client:</strong> ${invoice.customer_name}</div>
+          ${invoice.company_name ? `<div><strong>Société:</strong> ${invoice.company_name}</div>` : ''}
+          ${invoice.customer_email ? `<div><strong>Email:</strong> ${invoice.customer_email}</div>` : ''}
+          ${invoice.vat_number ? `<div><strong>N° TVA:</strong> ${invoice.vat_number}</div>` : ''}
         </div>
 
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Article</th>
-              <th>Prix unitaire HT</th>
-              <th>Quantité</th>
-              <th>Total HT</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${type === "simple" ? `
-              <tr>
-                <td>${meals.description}</td>
-                <td>${(invoice.subtotal_ht / meals.count).toFixed(2)} €</td>
-                <td>${meals.count}</td>
-                <td>${invoice.subtotal_ht.toFixed(2)} €</td>
-              </tr>
-            ` : items.map((item: any) => {
-              const priceHT = item.price / (1 + invoice.tax_rate);
-              const totalHT = priceHT * item.quantity;
-              return `
-                <tr>
-                  <td>${item.menu_item?.name || 'Article'}</td>
-                  <td>${priceHT.toFixed(2)} €</td>
-                  <td>${item.quantity}</td>
-                  <td>${totalHT.toFixed(2)} €</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+        <div class="items-section">
+          <div style="font-weight: bold; margin-bottom: 8px;">Articles:</div>
+          ${type === "simple" ? `
+            <div class="item-line">
+              <span class="item-name">${meals.description}</span>
+              <span class="item-price">${invoice.total_ttc.toFixed(2)} €</span>
+            </div>
+            <div class="quantity-line">${meals.count}x ${(invoice.total_ttc / meals.count).toFixed(2)} €</div>
+          ` : items.map((item: any) => {
+            const totalItem = item.price * item.quantity;
+            return `
+              <div class="item-line">
+                <span class="item-name">${item.menu_item?.name || 'Article'}</span>
+                <span class="item-price">${totalItem.toFixed(2)} €</span>
+              </div>
+              <div class="quantity-line">${item.quantity}x ${item.price.toFixed(2)} €</div>
+            `;
+          }).join('')}
+        </div>
 
-        <div class="totals">
-          <div class="total-row">
+        <div class="totals-section">
+          <div class="total-line">
             <span>Sous-total HT:</span>
             <span>${invoice.subtotal_ht.toFixed(2)} €</span>
           </div>
-          <div class="total-row">
+          <div class="total-line">
             <span>TVA (${(invoice.tax_rate * 100).toFixed(0)}%):</span>
             <span>${invoice.tax_amount.toFixed(2)} €</span>
           </div>
-          <div class="total-row final-total">
-            <span>Total TTC:</span>
+          <div class="total-line final-total">
+            <span>TOTAL TTC:</span>
             <span>${invoice.total_ttc.toFixed(2)} €</span>
           </div>
         </div>
 
+        <div class="separator">
+          ===============================
+        </div>
+
         <div class="footer">
-          <p><strong>Merci pour votre visite !</strong></p>
-          <p>Cette facture a été générée automatiquement le ${new Date().toLocaleString('fr-FR')}.</p>
+          <div><strong>Merci pour votre visite !</strong></div>
+          <div style="margin-top: 5px;">Matricule Fiscal: ${FISCAL_NUMBER}</div>
+          <div style="margin-top: 5px;">Imprimé le ${new Date().toLocaleString('fr-FR')}</div>
         </div>
       </body>
       </html>

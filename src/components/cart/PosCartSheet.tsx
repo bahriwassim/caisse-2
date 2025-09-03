@@ -19,31 +19,34 @@ import {
   Trash2,
   PackageCheck,
   Coins,
+  CreditCard,
 } from "lucide-react";
 import type { CartItem, PaymentMethod } from "@/lib/types";
 import { ScrollArea } from "../ui/scroll-area";
 import { Separator } from "../ui/separator";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useState as useNotificationState } from "react";
-import type { POSNotification } from "@/components/pos/POSNotifications";
-import POSNotifications from "@/components/pos/POSNotifications";
 import { supabase } from "@/lib/supabase";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 
 interface PosCartSheetProps {
   cart: CartItem[];
   updateCartQuantity: (menuItemId: string, quantity: number) => void;
   clearCart: () => void;
+  onNotification?: (notification: { id: string; title: string; description: string; type: 'success' | 'warning' | 'info'; duration: number }) => void;
 }
 
 export default function PosCartSheet({
   cart,
   updateCartQuantity,
   clearCart,
+  onNotification,
 }: PosCartSheetProps) {
   const [orderShortId, setOrderShortId] = useState("");
+  const [selectedTable, setSelectedTable] = useState<string>("1");
+  const [customerName, setCustomerName] = useState<string>("");
   const { toast } = useToast();
-  const [posNotifications, setPosNotifications] = useNotificationState<POSNotification[]>([]);
   
   useEffect(() => {
     // Generate a random order number for demo purposes
@@ -59,11 +62,12 @@ export default function PosCartSheet({
   const handleCheckout = async (paymentMethod: PaymentMethod) => {
      try {
        // 1. Create order
+        const finalCustomerName = customerName.trim() || `Client Table ${selectedTable}`;
         const { data: orderData, error: orderError } = await supabase
             .from('orders')
             .insert({
-                customer: `Client au comptoir`,
-                table_id: 0, // 0 for POS
+                customer: finalCustomerName,
+                table_id: parseInt(selectedTable) || 1,
                 status: 'in_preparation', // Assume paid immediately
                 payment_method: paymentMethod,
                 total: totalPrice,
@@ -87,41 +91,37 @@ export default function PosCartSheet({
         if (itemsError) throw itemsError;
 
         // POS notification on left side
-        const newNotification: POSNotification = {
-          id: Math.random().toString(36).substr(2, 9),
-          title: "Commande créée !",
-          description: `Commande #${orderShortId} ajoutée à la liste`,
-          type: 'success',
-          duration: 5000
-        };
-        setPosNotifications(prev => [...prev, newNotification]);
+        if (onNotification) {
+          onNotification({
+            id: Math.random().toString(36).substr(2, 9),
+            title: "Commande créée !",
+            description: `Commande #${orderShortId} ajoutée à la liste`,
+            type: 'success',
+            duration: 5000
+          });
+        }
         
         clearCart();
+        setCustomerName("");
+        setSelectedTable("1");
      } catch(e) {
         console.error("Error adding document: ", e);
         // POS error notification on left side
-        const errorNotification: POSNotification = {
-          id: Math.random().toString(36).substr(2, 9),
-          title: "Erreur",
-          description: "Impossible d'enregistrer la commande",
-          type: 'warning',
-          duration: 6000
-        };
-        setPosNotifications(prev => [...prev, errorNotification]);
+        if (onNotification) {
+          onNotification({
+            id: Math.random().toString(36).substr(2, 9),
+            title: "Erreur",
+            description: "Impossible d'enregistrer la commande",
+            type: 'warning',
+            duration: 6000
+          });
+        }
      }
   }
 
-  const handleCloseNotification = (id: string) => {
-    setPosNotifications(prev => prev.filter(notif => notif.id !== id));
-  };
 
   return (
-    <>
-      <POSNotifications 
-        notifications={posNotifications} 
-        onClose={handleCloseNotification} 
-      />
-      <Sheet>
+    <Sheet>
       <SheetTrigger asChild>
         <Button className="relative">
           <ShoppingCart className="mr-2 h-5 w-5" />
@@ -137,9 +137,43 @@ export default function PosCartSheet({
         <SheetHeader className="pr-10">
           <SheetTitle className="font-headline text-2xl">Nouvelle Commande</SheetTitle>
           <SheetDescription>
-            ID Commande : {orderShortId}
+            ID Commande : {orderShortId} • Table {selectedTable}
           </SheetDescription>
         </SheetHeader>
+        
+        {/* Customer and Table Selection */}
+        <div className="space-y-4 py-4 border-b">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="table-select" className="text-sm font-medium">
+                Table
+              </Label>
+              <Input
+                id="table-select"
+                type="number"
+                min="1"
+                max="50"
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(e.target.value)}
+                className="mt-1"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-name" className="text-sm font-medium">
+                Client (optionnel)
+              </Label>
+              <Input
+                id="customer-name"
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="mt-1"
+                placeholder="Nom du client"
+              />
+            </div>
+          </div>
+        </div>
         {cart.length === 0 ? (
           <div className="flex-grow flex flex-col items-center justify-center text-center">
              <ShoppingCart size={64} className="text-muted-foreground/50 mb-4" />
@@ -196,10 +230,10 @@ export default function PosCartSheet({
                 size="lg"
                 className="w-full"
                 disabled={cart.length === 0}
-                onClick={() => handleCheckout("Stripe")}
+                onClick={() => handleCheckout("TPE")}
               >
-                <PackageCheck className="mr-2 h-5 w-5" />
-                Payé par Stripe
+                <CreditCard className="mr-2 h-5 w-5" />
+                Payé par TPE
               </Button>
             </SheetClose>
             <SheetClose asChild>
@@ -217,6 +251,5 @@ export default function PosCartSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
-    </>
   );
 }

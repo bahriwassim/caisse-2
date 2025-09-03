@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { ClipboardList, DollarSign, Users, Clock, AlertTriangle, TrendingUp, Package, ShoppingCart, Filter } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { supabase } from "@/lib/supabase";
-import type { Order } from "@/lib/types";
+import type { Order, PaymentMethod } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,11 @@ import {
     endOfDay,
     endOfWeek,
     endOfMonth,
+    startOfQuarter,
+    endOfQuarter,
+    subQuarters,
+    startOfYear,
+    endOfYear,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -47,18 +53,98 @@ interface DashboardStats {
     salesData: { period: string; sales: number; revenue: number }[];
 }
 
-type PeriodFilter = 'day' | 'week' | 'month';
+type PeriodFilter = '7days' | '15days' | '30days' | '60days' | 'current_month' | 'last_month' | 'current_quarter' | 'last_quarter' | 'current_year';
 
 export default function Dashboard() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [dbError, setDbError] = useState<string | null>(null);
-    const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
+    const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('30days');
+
+  const getPaymentBadge = (method: PaymentMethod) => {
+    switch (method) {
+      case "TPE":
+        return <Badge variant="secondary" className="text-xs">TPE</Badge>;
+      case "Espèces":
+        return <Badge variant="outline" className="text-xs">Espèces</Badge>;
+      default:
+        return <Badge className="text-xs">{method}</Badge>;
+    }
+  };
 
   const calculatePeriodStats = (orders: Order[], period: PeriodFilter) => {
     const now = new Date();
-    const periodsToShow = period === 'day' ? 7 : period === 'week' ? 8 : 6;
+    let startDate: Date;
+    let endDate: Date;
+    let periodsToShow: number;
+    let periodType: 'day' | 'week' | 'month';
+
+    // Déterminer les dates de début et fin selon le filtre
+    switch (period) {
+      case '7days':
+        startDate = subDays(now, 6);
+        endDate = now;
+        periodsToShow = 7;
+        periodType = 'day';
+        break;
+      case '15days':
+        startDate = subDays(now, 14);
+        endDate = now;
+        periodsToShow = 15;
+        periodType = 'day';
+        break;
+      case '30days':
+        startDate = subDays(now, 29);
+        endDate = now;
+        periodsToShow = 30;
+        periodType = 'day';
+        break;
+      case '60days':
+        startDate = subDays(now, 59);
+        endDate = now;
+        periodsToShow = 60;
+        periodType = 'day';
+        break;
+      case 'current_month':
+        startDate = startOfMonth(now);
+        endDate = endOfMonth(now);
+        periodsToShow = endDate.getDate();
+        periodType = 'day';
+        break;
+      case 'last_month':
+        const lastMonth = subMonths(now, 1);
+        startDate = startOfMonth(lastMonth);
+        endDate = endOfMonth(lastMonth);
+        periodsToShow = endDate.getDate();
+        periodType = 'day';
+        break;
+      case 'current_quarter':
+        startDate = startOfQuarter(now);
+        endDate = endOfQuarter(now);
+        periodsToShow = 13; // ~3 mois
+        periodType = 'week';
+        break;
+      case 'last_quarter':
+        const lastQuarter = subQuarters(now, 1);
+        startDate = startOfQuarter(lastQuarter);
+        endDate = endOfQuarter(lastQuarter);
+        periodsToShow = 13; // ~3 mois
+        periodType = 'week';
+        break;
+      case 'current_year':
+        startDate = startOfYear(now);
+        endDate = endOfYear(now);
+        periodsToShow = 12;
+        periodType = 'month';
+        break;
+      default:
+        startDate = subDays(now, 29);
+        endDate = now;
+        periodsToShow = 30;
+        periodType = 'day';
+    }
+
     const periodData: { [key: string]: { sales: number; revenue: number; date: Date } } = {};
     
     // Initialiser les périodes
@@ -66,37 +152,41 @@ export default function Dashboard() {
       let periodStart: Date;
       let periodKey: string;
       
-      if (period === 'day') {
-        periodStart = subDays(now, periodsToShow - 1 - i);
+      if (periodType === 'day') {
+        periodStart = subDays(endDate, periodsToShow - 1 - i);
         periodKey = format(periodStart, 'yyyy-MM-dd');
-      } else if (period === 'week') {
-        periodStart = startOfWeek(subWeeks(now, periodsToShow - 1 - i));
+      } else if (periodType === 'week') {
+        periodStart = startOfWeek(subWeeks(endDate, periodsToShow - 1 - i));
         periodKey = format(periodStart, 'yyyy-ww');
       } else {
-        periodStart = startOfMonth(subMonths(now, periodsToShow - 1 - i));
+        periodStart = startOfMonth(subMonths(endDate, periodsToShow - 1 - i));
         periodKey = format(periodStart, 'yyyy-MM');
       }
       
       periodData[periodKey] = { sales: 0, revenue: 0, date: periodStart };
     }
     
-    // Comptabiliser les commandes
+    // Comptabiliser les commandes dans la période sélectionnée
     for (const order of orders) {
       if (order.created_at && order.status !== 'cancelled') {
         const orderDate = parseISO(order.created_at);
-        let periodKey: string;
         
-        if (period === 'day') {
-          periodKey = format(orderDate, 'yyyy-MM-dd');
-        } else if (period === 'week') {
-          periodKey = format(startOfWeek(orderDate), 'yyyy-ww');
-        } else {
-          periodKey = format(orderDate, 'yyyy-MM');
-        }
-        
-        if (periodData[periodKey]) {
-          periodData[periodKey].sales += 1;
-          periodData[periodKey].revenue += order.total;
+        // Vérifier si la commande est dans la période
+        if (orderDate >= startDate && orderDate <= endDate) {
+          let periodKey: string;
+          
+          if (periodType === 'day') {
+            periodKey = format(orderDate, 'yyyy-MM-dd');
+          } else if (periodType === 'week') {
+            periodKey = format(startOfWeek(orderDate), 'yyyy-ww');
+          } else {
+            periodKey = format(orderDate, 'yyyy-MM');
+          }
+          
+          if (periodData[periodKey]) {
+            periodData[periodKey].sales += 1;
+            periodData[periodKey].revenue += order.total;
+          }
         }
       }
     }
@@ -105,9 +195,9 @@ export default function Dashboard() {
     return Object.values(periodData)
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .map(data => ({
-        period: period === 'day' 
-          ? format(data.date, 'dd MMM', { locale: fr })
-          : period === 'week'
+        period: periodType === 'day' 
+          ? format(data.date, 'dd/MM', { locale: fr })
+          : periodType === 'week'
           ? `S${format(data.date, 'w', { locale: fr })}`
           : format(data.date, 'MMM', { locale: fr }),
         sales: data.sales,
@@ -318,18 +408,15 @@ export default function Dashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="day">
-                <span className="sm:hidden">7 derniers jours</span>
-                <span className="hidden sm:inline">Par jour (7 derniers)</span>
-              </SelectItem>
-              <SelectItem value="week">
-                <span className="sm:hidden">8 dernières semaines</span>
-                <span className="hidden sm:inline">Par semaine (8 dernières)</span>
-              </SelectItem>
-              <SelectItem value="month">
-                <span className="sm:hidden">6 derniers mois</span>
-                <span className="hidden sm:inline">Par mois (6 derniers)</span>
-              </SelectItem>
+              <SelectItem value="7days">7 derniers jours</SelectItem>
+              <SelectItem value="15days">15 derniers jours</SelectItem>
+              <SelectItem value="30days">30 derniers jours</SelectItem>
+              <SelectItem value="60days">60 derniers jours</SelectItem>
+              <SelectItem value="current_month">Mois en cours</SelectItem>
+              <SelectItem value="last_month">Mois dernier</SelectItem>
+              <SelectItem value="current_quarter">Trimestre en cours</SelectItem>
+              <SelectItem value="last_quarter">Dernier trimestre</SelectItem>
+              <SelectItem value="current_year">Année en cours</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -349,7 +436,9 @@ export default function Dashboard() {
                     <span className="sm:hidden">Commandes</span>
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    Par {periodFilter === 'day' ? 'jour' : periodFilter === 'week' ? 'semaine' : 'mois'}
+                    {periodFilter.includes('days') ? 'Par jour' : 
+                     periodFilter.includes('quarter') ? 'Par semaine' : 
+                     periodFilter.includes('year') ? 'Par mois' : 'Par jour'}
                   </CardDescription>
                 </div>
               </div>
@@ -397,7 +486,9 @@ export default function Dashboard() {
                     <span className="sm:hidden">CA</span>
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    Par {periodFilter === 'day' ? 'jour' : periodFilter === 'week' ? 'semaine' : 'mois'} (€)
+                    {periodFilter.includes('days') ? 'Par jour' : 
+                     periodFilter.includes('quarter') ? 'Par semaine' : 
+                     periodFilter.includes('year') ? 'Par mois' : 'Par jour'} (€)
                   </CardDescription>
                 </div>
               </div>
@@ -452,6 +543,7 @@ export default function Dashboard() {
                 <TableHeader>
                   <TableRow className="border-b">
                     <TableHead className="font-semibold text-xs sm:text-sm">Client</TableHead>
+                    <TableHead className="font-semibold text-xs sm:text-sm">Paiement</TableHead>
                     <TableHead className="text-right font-semibold text-xs sm:text-sm">Montant</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -463,6 +555,9 @@ export default function Dashboard() {
                         <div className="text-xs text-muted-foreground">
                             Table {order.table_id || 'N/A'}
                         </div>
+                        </TableCell>
+                        <TableCell className="py-2 sm:py-4">
+                          {getPaymentBadge(order.payment_method)}
                         </TableCell>
                         <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{order.total.toFixed(2)} €</TableCell>
                     </TableRow>

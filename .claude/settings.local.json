@@ -9,7 +9,8 @@
       "Bash(curl:*)",
       "Bash(powershell:*)",
       "Bash(node:*)",
-      "Bash(del test-api.mjs)"
+      "Bash(del test-api.mjs)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

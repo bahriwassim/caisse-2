@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -36,10 +37,9 @@ import { parseISO } from 'date-fns';
 import { InvoiceGenerator } from "@/components/admin/InvoiceGenerator";
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [activeOrders, setActiveOrders] = useState<FullOrder[]>([]);
   const [completedOrders, setCompletedOrders] = useState<FullOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<FullOrder | null>(null);
-  const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -287,14 +287,12 @@ export default function OrdersPage() {
     if (error) {
       console.error("Erreur de mise à jour du statut:", error);
       enhancedToast.error("Erreur", "Impossible de mettre à jour le statut de la commande.");
-    } else {
-       enhancedToast.success("Statut mis à jour", `La commande a été marquée comme "${status}".`, { duration: 4000 });
     }
+    // Suppression de la notification redondante - elle sera gérée par le realtime listener
   };
 
   const handleViewDetails = (order: FullOrder) => {
-    setSelectedOrder(order);
-    setShowOrderDetails(true);
+    router.push(`/admin/orders/${order.id}`);
   };
 
   const filterOrdersByPayment = (orders: FullOrder[]) => {
@@ -344,117 +342,6 @@ export default function OrdersPage() {
     return filtered;
   };
 
-  const OrderDetailsModal = () => {
-    if (!selectedOrder) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-4 flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Détails de la commande #{selectedOrder.short_id || selectedOrder.id.substring(0, 6)}</h3>
-            <Button variant="ghost" size="sm" onClick={() => setShowOrderDetails(false)}>×</Button>
-          </div>
-          
-          <div className="p-6 space-y-6">
-            {/* Info commande */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground">CLIENT</h4>
-                <p className="font-semibold">{selectedOrder.customer}</p>
-                <p className="text-sm text-muted-foreground">Table {selectedOrder.table_id}</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground">STATUT</h4>
-                {getStatusBadge(selectedOrder.status)}
-              </div>
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground">PAIEMENT</h4>
-                {getPaymentBadge(selectedOrder.payment_method)}
-              </div>
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground">HEURE</h4>
-                <p>{selectedOrder.created_at ? parseISO(selectedOrder.created_at).toLocaleString('fr-FR') : 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* Articles commandés */}
-            <div>
-              <h4 className="font-medium mb-3">Articles commandés</h4>
-              <div className="space-y-3">
-                {selectedOrder.order_items?.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex-1">
-                      <h5 className="font-medium">{item.menu_item?.name}</h5>
-                      <p className="text-sm text-muted-foreground">{item.menu_item?.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">×{item.quantity}</p>
-                      <p className="text-sm text-muted-foreground">{item.menu_item?.price.toFixed(2)}€ / unité</p>
-                    </div>
-                  </div>
-                )) || (
-                  <div className="text-center py-4 text-muted-foreground">
-                    Aucun détail disponible pour cette commande
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Total */}
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center font-semibold text-lg">
-                <span>Total</span>
-                <span>{selectedOrder.total.toFixed(2)} €</span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="space-y-3 pt-4">
-              <div className="flex gap-2">
-                {selectedOrder.status === 'awaiting_payment' && (
-                  <Button 
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'in_preparation')} 
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <CircleDollarSign className="mr-2 h-4 w-4" />
-                    Marquer comme Payée
-                  </Button>
-                )}
-                {selectedOrder.status === 'in_preparation' && (
-                  <Button 
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')} 
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    Marquer comme Livrée
-                  </Button>
-                )}
-                {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')} 
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    <Ban className="mr-2 h-4 w-4" />
-                    Annuler
-                  </Button>
-                )}
-              </div>
-
-              {/* Facturation Pro */}
-              {(selectedOrder.status === 'delivered' || selectedOrder.status === 'in_preparation') && (
-                <div className="border-t pt-3">
-                  <div className="flex items-center justify-center">
-                    <InvoiceGenerator order={selectedOrder} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const OrderTable = ({ orders }: { orders: FullOrder[] }) => (
     <div className="overflow-x-auto">
@@ -560,8 +447,8 @@ export default function OrdersPage() {
 
   const getPaymentBadge = (method: PaymentMethod) => {
      switch (method) {
-      case "Stripe":
-        return <Badge variant="secondary">Stripe</Badge>;
+      case "TPE":
+        return <Badge variant="secondary">TPE</Badge>;
       case "Espèces":
         return <Badge variant="outline">Espèces</Badge>;
       default:
@@ -681,7 +568,7 @@ export default function OrdersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tous</SelectItem>
-                    <SelectItem value="Stripe">Stripe</SelectItem>
+                    <SelectItem value="TPE">TPE</SelectItem>
                     <SelectItem value="Espèces">Espèces</SelectItem>
                   </SelectContent>
                 </Select>
@@ -747,7 +634,6 @@ export default function OrdersPage() {
           </Tabs>
         </CardContent>
       </Card>
-      {showOrderDetails && <OrderDetailsModal />}
     </div>
   );
 }

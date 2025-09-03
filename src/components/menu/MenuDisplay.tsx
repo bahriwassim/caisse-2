@@ -174,8 +174,9 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
       }
       return [...prevCart, { menuItem, quantity: 1 }];
     });
-    // POS notification on left side if in POS mode
+    
     if (isPosMode) {
+      // POS notification on left side if in POS mode
       const notification: POSNotification = {
         id: Math.random().toString(36).substr(2, 9),
         title: "Ajouté",
@@ -184,6 +185,13 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         duration: 2000
       };
       setPosNotifications(prev => [...prev, notification]);
+    } else {
+      // Client notification with toast
+      toast({
+        title: "Ajouté au panier",
+        description: `${menuItem.name} a été ajouté à votre panier`,
+        duration: 2000,
+      });
     }
   };
 
@@ -296,7 +304,18 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
                 </div>
                 <CardDescription className="text-sm sm:text-base">Créez une nouvelle commande pour un client au comptoir.</CardDescription>
               </div>
-              <PosCartSheet cart={cart} updateCartQuantity={updateCartQuantity} clearCart={clearCart} />
+              <PosCartSheet 
+                cart={cart} 
+                updateCartQuantity={updateCartQuantity} 
+                clearCart={clearCart}
+                onNotification={(notification) => {
+                  const posNotification: POSNotification = {
+                    ...notification,
+                    type: notification.type as 'success' | 'warning' | 'info'
+                  };
+                  setPosNotifications(prev => [...prev, posNotification]);
+                }}
+              />
             </div>
         </CardHeader>
       )

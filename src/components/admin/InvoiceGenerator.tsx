@@ -435,10 +435,29 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
                     <Button 
                       variant="outline" 
                       className="w-full"
-                      onClick={() => window.print()}
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`/api/invoices/${generatedInvoice.id}/pdf`);
+                          if (!response.ok) throw new Error('Erreur lors du téléchargement');
+                          
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `facture-${generatedInvoice.invoice_number}.pdf`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          window.URL.revokeObjectURL(url);
+                          
+                          enhancedToast.success("PDF téléchargé", `Facture ${generatedInvoice.invoice_number} téléchargée`);
+                        } catch (error) {
+                          enhancedToast.error("Erreur", "Impossible de télécharger le PDF");
+                        }
+                      }}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Imprimer
+                      Télécharger PDF
                     </Button>
                   </div>
 

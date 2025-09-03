@@ -3,7 +3,7 @@
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AdminHeader from "@/components/layout/AdminHeader";
-import { QrCode, ClipboardList, Utensils, LayoutDashboard, ShoppingCart, FileText, LogOut, Loader2 } from "lucide-react";
+import { QrCode, ClipboardList, Utensils, LayoutDashboard, ShoppingCart, FileText, LogOut, Loader2, Building } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -115,6 +115,10 @@ export default function AdminLayout({
               <Link href="/admin/invoices" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <FileText />
                 <span>Facturation Pro</span>
+              </Link>
+              <Link href="/admin/restaurant" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
+                <Building />
+                <span>Restaurant</span>
               </Link>
               <Link href="/admin/qr-generator" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <QrCode />

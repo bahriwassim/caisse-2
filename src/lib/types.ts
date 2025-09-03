@@ -18,7 +18,7 @@ export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderItem = Database['public']['Tables']['order_items']['Row'] & { menu_item: MenuItem };
 
 export type OrderStatus = "awaiting_payment" | "in_preparation" | "delivered" | "cancelled";
-export type PaymentMethod = "Stripe" | "Espèces";
+export type PaymentMethod = "TPE" | "Espèces";
 
 export type FullOrder = Order & {
     order_items: OrderItem[]

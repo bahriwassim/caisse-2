@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { EnhancedToastProvider } from "@/hooks/use-enhanced-toast";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({
         >
           <EnhancedToastProvider>
             {children}
+            <Toaster />
           </EnhancedToastProvider>
         </ThemeProvider>
       </body>
