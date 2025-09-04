@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Download, Calculator, Clock, Eye, CheckCircle } from "lucide-react";
+import { FileText, Mail, Printer, Calculator, Clock, Eye, CheckCircle } from "lucide-react";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
+import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
 import type { FullOrder, Invoice } from "@/lib/types";
 
 interface InvoiceGeneratorProps {
@@ -30,6 +31,7 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(null);
   const [invoiceType, setInvoiceType] = useState<"detailed" | "simple">("detailed");
   const enhancedToast = useEnhancedToast();
+  const { details: restaurantDetails } = useRestaurantDetails();
 
   const TAX_RATE = 0.10;
   const FISCAL_NUMBER = "FR123456789012"; // Remplacez par votre matricule fiscal
@@ -40,9 +42,9 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
   // Calcul du nombre de repas pour facture simple
   const calculateMeals = (total: number) => {
     if (total <= 50) {
-      return { count: 1, description: "Repas" };
+      return { count: 1, description: "1 Repas" };
     } else {
-      return { count: 2, description: "Repas" };
+      return { count: 2, description: "2 Repas" };
     }
   };
 
@@ -80,22 +82,76 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
   const generateInvoice = async () => {
     setIsGenerating(true);
     try {
+      console.log('=== Début génération facture côté client ===');
+      console.log('Order ID:', order.id);
+      console.log('Restaurant Details:', restaurantDetails);
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      // Séparer les détails du restaurant en excluant le logo volumineux
+      let restaurantDetailsWithoutLogo = null;
+      if (restaurantDetails) {
+        restaurantDetailsWithoutLogo = {
+          name: restaurantDetails.name,
+          address: restaurantDetails.address,
+          city: restaurantDetails.city,
+          postalCode: restaurantDetails.postalCode,
+          phone: restaurantDetails.phone,
+          email: restaurantDetails.email,
+          website: restaurantDetails.website,
+          fiscalNumber: restaurantDetails.fiscalNumber,
+          vatNumber: restaurantDetails.vatNumber,
+          siretNumber: restaurantDetails.siretNumber,
+          hasLogo: !!restaurantDetails.logo
+        };
+      }
+
+      const requestBody = {
+        orderId: order.id,
+        customerEmail: customerEmail || null,
+        companyName: companyName || null,
+        vatNumber: vatNumber || null,
+        invoiceType: invoiceType,
+        restaurantDetails: restaurantDetailsWithoutLogo
+      };
+
+      console.log('Request body:', requestBody);
+      console.log('Headers:', headers);
+
       const response = await fetch('/api/invoices/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.id,
-          customerEmail: customerEmail || null,
-          companyName: companyName || null,
-          vatNumber: vatNumber || null,
-          invoiceType: invoiceType
-        })
+        headers,
+        body: JSON.stringify(requestBody)
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la génération');
+        console.error('Response not ok:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        
+        if (!responseText) {
+          throw new Error('Réponse vide du serveur');
+        }
+        
+        data = JSON.parse(responseText);
+        console.log('Parsed response:', data);
+      } catch (parseError) {
+        console.error('Erreur parsing réponse:', parseError);
+        throw new Error('Réponse du serveur invalide');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
       }
 
       setGeneratedInvoice(data.invoice);
@@ -438,26 +494,36 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
                       onClick={async () => {
                         try {
                           const response = await fetch(`/api/invoices/${generatedInvoice.id}/pdf`);
-                          if (!response.ok) throw new Error('Erreur lors du téléchargement');
+                          if (!response.ok) throw new Error('Erreur lors de l\'impression');
                           
                           const blob = await response.blob();
                           const url = window.URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `facture-${generatedInvoice.invoice_number}.pdf`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          window.URL.revokeObjectURL(url);
                           
-                          enhancedToast.success("PDF téléchargé", `Facture ${generatedInvoice.invoice_number} téléchargée`);
+                          // Créer un iframe caché pour l'impression
+                          const iframe = document.createElement('iframe');
+                          iframe.style.display = 'none';
+                          iframe.src = url;
+                          
+                          document.body.appendChild(iframe);
+                          
+                          // Attendre que le PDF soit chargé puis imprimer
+                          iframe.onload = () => {
+                            iframe.contentWindow?.print();
+                            // Nettoyer après impression
+                            setTimeout(() => {
+                              document.body.removeChild(iframe);
+                              window.URL.revokeObjectURL(url);
+                            }, 1000);
+                          };
+                          
+                          enhancedToast.success("Impression lancée", `Facture ${generatedInvoice.invoice_number} envoyée à l'imprimante`);
                         } catch (error) {
-                          enhancedToast.error("Erreur", "Impossible de télécharger le PDF");
+                          enhancedToast.error("Erreur", "Impossible d'imprimer la facture");
                         }
                       }}
                     >
-                      <Download className="mr-2 h-4 w-4" />
-                      Télécharger PDF
+                      <Printer className="mr-2 h-4 w-4" />
+                      Imprimer la facture
                     </Button>
                   </div>
 

@@ -14,11 +14,32 @@ try {
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderId, customerEmail, companyName, vatNumber, invoiceType } = await req.json();
+    console.log('=== Début génération facture ===');
+    
+    // Vérifier que le body existe et est valide
+    let body;
+    try {
+      body = await req.json();
+      console.log('Body reçu:', body);
+    } catch (jsonError) {
+      console.error('Erreur parsing JSON body:', jsonError);
+      return NextResponse.json({ error: 'Données de requête invalides' }, { status: 400 });
+    }
+
+    const { orderId, customerEmail, companyName, vatNumber, invoiceType, restaurantDetails } = body;
 
     if (!orderId) {
+      console.error('ID de commande manquant');
       return NextResponse.json({ error: 'ID de commande requis' }, { status: 400 });
     }
+
+    // Validation des types
+    if (typeof orderId !== 'string') {
+      console.error('Type d\'ID de commande invalide:', typeof orderId);
+      return NextResponse.json({ error: 'ID de commande doit être une chaîne' }, { status: 400 });
+    }
+
+    console.log('Validation réussie, recherche de la commande...');
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -73,6 +94,9 @@ export async function POST(req: NextRequest) {
 
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
 
+    // Les détails du restaurant sont maintenant dans le body (déjà optimisés côté client)
+    console.log('Restaurant details reçus:', restaurantDetails ? 'Présents' : 'Absents');
+
     const invoiceData = {
       invoice_number: invoiceNumber,
       order_id: orderId,
@@ -85,11 +109,14 @@ export async function POST(req: NextRequest) {
       total_ttc: totalTTC,
       tax_rate: TAX_RATE,
       invoice_type: invoiceType || 'detailed',
+      restaurant_details: restaurantDetails,
       created_at: new Date().toISOString(),
       sent_at: null,
       status: 'draft'
     };
 
+    console.log('Tentative d\'insertion de la facture avec les données:', invoiceData);
+    
     const { data: invoice, error: invoiceError } = await client
       .from('invoices')
       .insert(invoiceData)
@@ -98,8 +125,21 @@ export async function POST(req: NextRequest) {
 
     if (invoiceError) {
       console.error('Erreur lors de la création de la facture:', invoiceError);
-      return NextResponse.json({ error: 'Impossible de créer la facture' }, { status: 500 });
+      
+      // Vérifier si l'erreur est liée à des colonnes manquantes
+      if (invoiceError.message?.includes('column') && invoiceError.message?.includes('does not exist')) {
+        return NextResponse.json({ 
+          error: 'La table invoices doit être mise à jour. Exécutez le script supabase_update_invoices_table.sql dans Supabase SQL Editor.' 
+        }, { status: 500 });
+      }
+      
+      return NextResponse.json({ 
+        error: 'Impossible de créer la facture', 
+        details: invoiceError.message 
+      }, { status: 500 });
     }
+
+    console.log('Facture créée avec succès:', invoice);
 
     return NextResponse.json({ 
       success: true, 

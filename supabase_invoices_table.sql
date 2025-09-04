@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   tax_amount numeric(10,2) NOT NULL,
   total_ttc numeric(10,2) NOT NULL,
   tax_rate numeric(4,4) NOT NULL DEFAULT 0.10,
+  invoice_type text NOT NULL DEFAULT 'detailed' CHECK (invoice_type IN ('detailed', 'simple')),
+  restaurant_details jsonb,
   created_at timestamptz DEFAULT now(),
   sent_at timestamptz,
   status text NOT NULL CHECK (status IN ('draft', 'sent', 'paid')) DEFAULT 'draft'
@@ -38,7 +40,7 @@ DROP POLICY IF EXISTS "Enable insert for service role" ON invoices;
 CREATE POLICY "Enable read for all users" ON invoices
     FOR SELECT USING (true);
 
--- Permettre l'insertion via l'API (côté serveur)Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+-- Permettre l'insertion via l'API (côté serveur)
 CREATE POLICY "Enable insert for service role" ON invoices
     FOR INSERT WITH CHECK (true);
 

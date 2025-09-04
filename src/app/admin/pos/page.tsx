@@ -2,6 +2,7 @@
 import type { MenuCategory } from "@/lib/types";
 import MenuDisplay from "@/components/menu/MenuDisplay";
 import SystemStatusControl from "@/components/admin/SystemStatusControl";
+import PaymentMethodsControl from "@/components/admin/PaymentMethodsControl";
 import { getMenu, seedDatabaseIfNeeded } from "@/lib/services/menuService";
 import { Card, CardHeader } from "@/components/ui/card";
 
@@ -18,9 +19,12 @@ export default async function PosPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
             <div className="flex-1">
               <h2 className="text-base sm:text-lg font-semibold">Contrôle du Système</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">Gérez l'état des commandes en ligne</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Gérez l'état des commandes en ligne et les méthodes de paiement</p>
             </div>
-            <SystemStatusControl />
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <PaymentMethodsControl />
+              <SystemStatusControl />
+            </div>
           </div>
         </CardHeader>
       </Card>

@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 let systemStatus = {
   ordersEnabled: true,
   pausedAt: null as string | null,
-  pausedReason: 'Le système de commandes en ligne est temporairement en pause en raison d\'une forte affluence. Nos chefs préparent avec amour toutes vos commandes ! 🍕👨‍🍳'
+  pausedReason: 'Le système de commandes en ligne est temporairement en pause. Notre équipe fait de son mieux pour vous servir dans les meilleures conditions.🍕👨‍🍳',
+  paymentMethods: {
+    cash: true,
+    card: true
+  }
 };
 
 export async function GET() {
@@ -14,7 +18,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, password } = await req.json();
+    const body = await req.json();
+    const { action, password, paymentMethods } = body;
 
     // Verify password
     if (password !== '000000') {
@@ -27,16 +32,27 @@ export async function POST(req: NextRequest) {
     } else if (action === 'activate') {
       systemStatus.ordersEnabled = true;
       systemStatus.pausedAt = null;
+    } else if (action === 'updatePaymentMethods') {
+      if (paymentMethods) {
+        systemStatus.paymentMethods = paymentMethods;
+      }
     } else {
       return NextResponse.json({ error: 'Action invalide' }, { status: 400 });
+    }
+
+    let message = '';
+    if (action === 'pause') {
+      message = 'Système de commandes mis en pause';
+    } else if (action === 'activate') {
+      message = 'Système de commandes réactivé avec succès';
+    } else if (action === 'updatePaymentMethods') {
+      message = 'Méthodes de paiement mises à jour';
     }
 
     return NextResponse.json({ 
       success: true, 
       status: systemStatus,
-      message: systemStatus.ordersEnabled 
-        ? 'Système de commandes réactivé avec succès' 
-        : 'Système de commandes mis en pause'
+      message
     });
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

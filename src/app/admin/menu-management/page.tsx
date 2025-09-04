@@ -16,6 +16,9 @@ import type { MenuItem } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { seedDatabaseIfNeeded } from "@/lib/services/menuService";
+import { UpdateJamaicanBowlButton } from "@/components/admin/UpdateJamaicanBowlButton";
+import { ResetMenuButton } from "@/components/admin/ResetMenuButton";
+import { ImageTestComponent } from "@/components/admin/ImageTestComponent";
 
 
 export default function MenuManagementPage() {
@@ -136,6 +139,13 @@ export default function MenuManagementPage() {
                   <CardDescription className="text-sm sm:text-base hidden sm:block">
                     Ajoutez, modifiez ou supprimez des articles de votre menu. Les changements sont visibles en temps réel.
                   </CardDescription>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <UpdateJamaicanBowlButton />
+                      <ResetMenuButton />
+                    </div>
+                    <ImageTestComponent />
+                  </div>
               </div>
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                   <DialogTrigger asChild>

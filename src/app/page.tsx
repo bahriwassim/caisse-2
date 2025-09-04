@@ -1,10 +1,16 @@
+"use client"
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Utensils, QrCode } from "lucide-react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
+import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
+import { RestaurantDebug } from "@/components/debug/RestaurantDebug";
 
 export default function Home() {
+  const { details, isLoading } = useRestaurantDetails();
+
   return (
     <div className="flex flex-col w-full">
       <Header />
@@ -13,12 +19,20 @@ export default function Home() {
           <Card className="bg-card/80 backdrop-blur-sm">
             <CardContent className="p-8 sm:p-12 md:p-16">
               <div className="flex justify-center mb-6">
-                <div className="p-4 bg-primary rounded-full">
-                  <Utensils className="h-10 w-10 text-primary-foreground" />
-                </div>
+                {!isLoading && details?.logo ? (
+                  <img 
+                    src={details.logo} 
+                    alt={details.name || "Logo du restaurant"} 
+                    className="h-20 w-auto object-contain"
+                  />
+                ) : (
+                  <div className="p-4 bg-primary rounded-full">
+                    <Utensils className="h-10 w-10 text-primary-foreground" />
+                  </div>
+                )}
               </div>
               <h1 className="text-4xl md:text-5xl font-bold font-headline text-foreground mb-4">
-                Bienvenue sur Caisse Events Lite
+                Bienvenue sur {!isLoading && details?.name ? details.name : "Caisse Events Lite"}
               </h1>
               <p className="text-lg md:text-xl text-muted-foreground mb-8">
                 Scannez le code QR sur votre table pour voir le menu et passer votre commande instantanément.
@@ -38,6 +52,7 @@ export default function Home() {
           </Card>
         </div>
       </main>
+      <RestaurantDebug />
     </div>
   );
 }

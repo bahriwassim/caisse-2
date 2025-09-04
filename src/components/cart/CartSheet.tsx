@@ -50,7 +50,14 @@ export default function CartSheet({
   onOrderPlaced,
 }: CartSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [systemStatus, setSystemStatus] = useState({ ordersEnabled: true, pausedReason: '' });
+  const [systemStatus, setSystemStatus] = useState({ 
+    ordersEnabled: true, 
+    pausedReason: '',
+    paymentMethods: {
+      cash: true,
+      card: true
+    }
+  });
   const { toast } = useToast();
 
   // Check system status
@@ -319,7 +326,7 @@ export default function CartSheet({
                   Paiement à la caisse
                 </h4>
                 <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                  Pour payer en espèces, présentez-vous à la caisse avec votre numéro de commande après validation.
+                 Pour régler en caisse (espèces, carte…), présentez-vous avec votre numéro de commande obtenu après validation.
                 </p>
               </div>
             </div>
@@ -327,15 +334,18 @@ export default function CartSheet({
         )}
 
         <SheetFooter className="grid grid-cols-1 gap-2 pt-2">
-           <Button
-           size="lg"
-           className="w-full h-12 sm:h-10 text-sm sm:text-base"
-           disabled={cart.length === 0 || isLoading || !systemStatus.ordersEnabled}
-           onClick={handleStripeCheckout}
-           >
-           {isLoading ? <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />}
-             <span className="truncate">{systemStatus.ordersEnabled ? 'Carte bancaire' : 'Commandes suspendues'}</span>
-           </Button>
+           {systemStatus.paymentMethods.card && (
+             <Button
+             size="lg"
+             className="w-full h-12 sm:h-10 text-sm sm:text-base"
+             disabled={cart.length === 0 || isLoading || !systemStatus.ordersEnabled}
+             onClick={handleStripeCheckout}
+             >
+             {isLoading ? <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />}
+               <span className="truncate">{systemStatus.ordersEnabled ? 'Paiement en ligne( Apple & Google Pay,Visa…)' : 'Commandes suspendues'}</span>
+             </Button>
+           )}
+           {systemStatus.paymentMethods.cash && (
              <SheetClose asChild>
                 <Button
                     size="lg"
@@ -348,6 +358,7 @@ export default function CartSheet({
                     <span className="truncate">{systemStatus.ordersEnabled ? 'Payer à la caisse' : 'Commandes suspendues'}</span>
                 </Button>
             </SheetClose>
+           )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

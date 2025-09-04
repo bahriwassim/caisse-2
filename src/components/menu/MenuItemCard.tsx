@@ -26,9 +26,9 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
   const [prepTime, setPrepTime] = useState(15);
   const [mounted, setMounted] = useState(false);
 
-  // Utilise l'image Pizza-margherita.jpg pour tous les produits
+  // Utilise l'image du produit ou une image par défaut
   const getProductImage = () => {
-    return '/images/Pizza-margherita.jpg';
+    return item.image || '/images/Pizza-margherita.jpg';
   };
 
   const imageUrl = getProductImage();

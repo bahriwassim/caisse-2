@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Save, Building, MapPin, Phone, Mail, FileText, Hash } from "lucide-react";
+import { Save, Building, MapPin, Phone, Mail, FileText, Hash, Image, Upload } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 
@@ -23,6 +23,7 @@ interface RestaurantDetails {
   vatNumber: string;
   fiscalNumber: string;
   siretNumber?: string;
+  logo?: string;
 }
 
 export default function RestaurantDetailsPage() {
@@ -37,7 +38,8 @@ export default function RestaurantDetailsPage() {
     description: "",
     vatNumber: "",
     fiscalNumber: "FR123456789012",
-    siretNumber: ""
+    siretNumber: "",
+    logo: ""
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,6 +62,36 @@ export default function RestaurantDetailsPage() {
     setDetails(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Vérifier la taille du fichier (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        enhancedToast.error("Fichier trop volumineux", "La taille du logo ne doit pas dépasser 2MB");
+        return;
+      }
+
+      // Vérifier le type de fichier
+      if (!file.type.startsWith('image/')) {
+        enhancedToast.error("Format non supporté", "Seuls les fichiers image sont acceptés");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target?.result as string;
+        setDetails(prev => ({ ...prev, logo: base64String }));
+        enhancedToast.success("Logo ajouté", "Le logo a été téléchargé avec succès");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setDetails(prev => ({ ...prev, logo: "" }));
+    enhancedToast.info("Logo supprimé", "Le logo a été retiré");
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -76,6 +108,9 @@ export default function RestaurantDetailsPage() {
 
       // Sauvegarder dans localStorage
       localStorage.setItem('restaurantDetails', JSON.stringify(details));
+      
+      // Déclencher un événement personnalisé pour notifier les autres composants
+      window.dispatchEvent(new Event('restaurantDetailsUpdated'));
       
       enhancedToast.success(
         "Détails sauvegardés", 
@@ -172,6 +207,78 @@ export default function RestaurantDetailsPage() {
                 placeholder="Brève description de votre restaurant..."
                 rows={3}
               />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Logo */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Image className="h-5 w-5" />
+              Logo du restaurant
+            </h3>
+            
+            <div className="space-y-4">
+              {details.logo ? (
+                <div className="flex flex-col items-start gap-4">
+                  <div className="relative">
+                    <img 
+                      src={details.logo} 
+                      alt="Logo du restaurant" 
+                      className="max-w-xs max-h-32 object-contain border rounded-lg shadow-sm"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Changer le logo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Image className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">Aucun logo sélectionné</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Télécharger un logo
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <input
+                id="logo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+              />
+              
+              <p className="text-xs text-muted-foreground">
+                Formats acceptés : JPG, PNG, GIF. Taille maximale : 2MB. 
+                Le logo sera affiché à la place de "Caisse Events Lite" dans l'interface client.
+              </p>
             </div>
           </div>
 

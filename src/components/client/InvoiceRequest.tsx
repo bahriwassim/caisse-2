@@ -136,9 +136,9 @@ export function InvoiceRequest({ order, className, onDialogOpenChange }: Invoice
   // Calcul du nombre de repas pour facture simple
   const calculateMeals = (total: number) => {
     if (total <= 50) {
-      return { count: 1, description: "Repas" };
+      return { count: 1, description: "1 Repas" };
     } else {
-      return { count: 2, description: "Repas" };
+      return { count: 2, description: "2 Repas" };
     }
   };
 

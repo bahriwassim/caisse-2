@@ -3,7 +3,6 @@
 
 import type { MenuCategory, CartItem, MenuItem, Order, FullOrder } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MenuItemCard from "./MenuItemCard";
 import CartSheet from "../cart/CartSheet";
 import PosCartSheet from "../cart/PosCartSheet";
@@ -191,6 +190,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         title: "Ajouté au panier",
         description: `${menuItem.name} a été ajouté à votre panier`,
         duration: 2000,
+        variant: "success",
       });
     }
   };
@@ -394,32 +394,11 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
       {showMenu && (
         <>
             <PageHeader />
-            <Tabs defaultValue={menu[0]?.id || 'entrees'} className="w-full">
-                <TabsList className={`grid w-full gap-2 mb-6 sm:mb-8 ${
-                  menu.length <= 2 ? 'grid-cols-2' : 
-                  menu.length <= 3 ? 'grid-cols-1 sm:grid-cols-3' :
-                  'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-                } h-auto p-1`}>
-                {menu.map((category) => (
-                    <TabsTrigger 
-                      key={category.id} 
-                      value={category.id}
-                      className="text-xs sm:text-sm py-2 px-2 sm:px-4 h-auto whitespace-nowrap"
-                    >
-                      {category.name}
-                    </TabsTrigger>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {menu.flatMap((category) => category.items).map((item) => (
+                    <MenuItemCard key={item.id} item={item} onAddToCart={addToCart} />
                 ))}
-                </TabsList>
-                {menu.map((category) => (
-                <TabsContent key={category.id} value={category.id} className="mt-4 sm:mt-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {category.items.map((item) => (
-                        <MenuItemCard key={item.id} item={item} onAddToCart={addToCart} />
-                    ))}
-                    </div>
-                </TabsContent>
-                ))}
-            </Tabs>
+            </div>
         </>
       )}
       </div>

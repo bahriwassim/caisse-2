@@ -1,7 +1,73 @@
-
 import { supabase } from "@/lib/supabase";
 import type { MenuCategory, MenuItem } from "@/lib/types";
 
+// Fonction pour forcer la mise à jour du JAMAICAN BOWL
+export const forceUpdateJamaicanBowl = async () => {
+    console.log("🔄 Mise à jour forcée du JAMAICAN BOWL...");
+    
+    const jamaicanBowlData = {
+        name: "JAMAICAN BOWL",
+        description: "Jerk chicken wings / rice & peas / fried plantain / steamed cabbage",
+        price: 15,
+        category: "Bols",
+        status: "available",
+        image: "/images/jamaican-poke-bowl-08-683x1024.jpg",
+        aiHint: "jamaican food"
+    };
+
+    try {
+        // Vérifier si le produit existe déjà
+        const { data: existingItem, error: fetchError } = await supabase
+            .from('menu_items')
+            .select('*')
+            .eq('name', 'JAMAICAN BOWL')
+            .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            console.error("Erreur lors de la recherche:", fetchError);
+            return { success: false, error: fetchError.message };
+        }
+
+        if (existingItem) {
+            // Mettre à jour le produit existant
+            console.log("📝 Produit trouvé, mise à jour...");
+            const { data, error } = await supabase
+                .from('menu_items')
+                .update(jamaicanBowlData)
+                .eq('name', 'JAMAICAN BOWL')
+                .select();
+            
+            if (error) {
+                console.error("Erreur mise à jour:", error);
+                return { success: false, error: error.message };
+            }
+            
+            console.log("✅ JAMAICAN BOWL mis à jour:", data);
+            return { success: true, action: 'updated', data };
+        } else {
+            // Créer le produit
+            console.log("➕ Création du JAMAICAN BOWL...");
+            const { data, error } = await supabase
+                .from('menu_items')
+                .insert(jamaicanBowlData)
+                .select();
+            
+            if (error) {
+                console.error("Erreur création:", error);
+                return { success: false, error: error.message };
+            }
+            
+            console.log("✅ JAMAICAN BOWL créé:", data);
+            return { success: true, action: 'created', data };
+        }
+    } catch (error) {
+        console.error("Erreur inattendue:", error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Erreur inconnue' 
+        };
+    }
+};
 
 export const seedDatabaseIfNeeded = async () => {
     const { data, count } = await supabase.from('menu_items').select('*', { count: 'exact', head: true });
@@ -54,6 +120,10 @@ export const seedDatabaseIfNeeded = async () => {
         } else {
             console.log("Database seeded successfully.");
         }
+    } else {
+        console.log(`Menu already has ${count} items. Checking JAMAICAN BOWL...`);
+        // Forcer la mise à jour du JAMAICAN BOWL même si la DB n'est pas vide
+        await forceUpdateJamaicanBowl();
     }
 }
 
