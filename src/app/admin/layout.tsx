@@ -90,7 +90,7 @@ export default function AdminLayout({
             <nav className="flex items-center gap-2">
               <Link href="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <LayoutDashboard />
-                <span>Tableau de bord</span>
+                <span>Tableau de bord.</span>
               </Link>
               <Link href="/admin/pos" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <ShoppingCart />
