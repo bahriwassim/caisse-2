@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { MenuItem } from "@/lib/types";
+import ImageUpload from "./ImageUpload";
 
 const formSchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères."),
@@ -17,7 +18,7 @@ const formSchema = z.object({
   price: z.coerce.number().positive("Le prix doit être un nombre positif."),
   category: z.string().min(1, "Veuillez sélectionner une catégorie."),
   status: z.enum(["available", "out_of_stock"]),
-  image: z.string().url("Veuillez entrer une URL d'image valide.").optional().or(z.literal('')),
+  image: z.string().optional(),
   aiHint: z.string().optional(),
 });
 
@@ -132,19 +133,25 @@ export default function MenuItemForm({ onSubmit, defaultValues, onCancel }: Menu
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="image"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL de l'image (optionnel)</FormLabel>
-              <FormControl>
-                <Input placeholder="https://exemple.com/image.jpg" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4">
+          <ImageUpload
+            currentImageUrl={form.watch("image")}
+            onImageUploaded={(url) => form.setValue("image", url)}
+          />
+          <FormField
+            control={form.control}
+            name="image"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>URL de l'image (optionnel)</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://exemple.com/image.jpg" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onCancel}>Annuler</Button>
             <Button type="submit">{defaultValues ? "Enregistrer" : "Créer"}</Button>

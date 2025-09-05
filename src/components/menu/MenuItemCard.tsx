@@ -25,13 +25,37 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
   const [showPrepTime, setShowPrepTime] = useState(false);
   const [prepTime, setPrepTime] = useState(15);
   const [mounted, setMounted] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Utilise l'image du produit ou une image par défaut
   const getProductImage = () => {
-    return item.image || '/images/Pizza-margherita.jpg';
+    if (imageError) {
+      // Si l'image ne charge pas, utilise une image de placeholder
+      return 'https://placehold.co/400x300/e5e5e5/666666?text=Image+Non+Disponible';
+    }
+    // Priorité : image du produit, sinon image par défaut
+    if (item.image) {
+      return item.image;
+    }
+    // Images par défaut locales
+    return '/images/Pizza-margherita.jpg';
   };
 
   const imageUrl = getProductImage();
+
+  const handleImageError = () => {
+    console.log('❌ Image failed to load:', imageUrl, 'for item:', item.name);
+    console.log('📊 Item details:', { 
+      itemId: item.id, 
+      itemImage: item.image, 
+      currentUrl: imageUrl 
+    });
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    console.log('✅ Image loaded successfully:', imageUrl, 'for item:', item.name);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -51,6 +75,10 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
             fill
             className="object-cover group-hover:scale-110 transition-transform duration-500"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            onError={handleImageError}
+            onLoad={handleImageLoad}
+            priority={false}
+            unoptimized={false}
           />
           {/* Overlay avec gradient subtil */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

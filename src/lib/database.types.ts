@@ -186,6 +186,63 @@ export type Database = {
         }
         Relationships: []
       }
+      restaurant_info: {
+        Row: {
+          id: string
+          name: string
+          address: string
+          city: string
+          postal_code: string
+          country: string
+          phone: string | null
+          email: string | null
+          website: string | null
+          logo_url: string | null
+          siret: string | null
+          vat_number: string | null
+          legal_form: string | null
+          capital: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          address: string
+          city: string
+          postal_code: string
+          country?: string
+          phone?: string | null
+          email?: string | null
+          website?: string | null
+          logo_url?: string | null
+          siret?: string | null
+          vat_number?: string | null
+          legal_form?: string | null
+          capital?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          address?: string
+          city?: string
+          postal_code?: string
+          country?: string
+          phone?: string | null
+          email?: string | null
+          website?: string | null
+          logo_url?: string | null
+          siret?: string | null
+          vat_number?: string | null
+          legal_form?: string | null
+          capital?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -28,6 +28,101 @@ interface MenuDisplayProps {
 
 export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDisplayProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const loadCart = () => {
+      if (isPosMode) {
+        const savedCart = localStorage.getItem('pos_cart');
+        console.log('MenuDisplay loading POS cart:', savedCart);
+        if (savedCart) {
+          try {
+            const parsedCart = JSON.parse(savedCart);
+            console.log('MenuDisplay loaded POS cart:', parsedCart);
+            setCart(parsedCart);
+            setHasLoaded(true);
+          } catch (error) {
+            console.error('Error loading POS cart from localStorage:', error);
+          }
+        }
+      } else {
+        const savedCart = localStorage.getItem(`cart_table_${tableId}`);
+        console.log('MenuDisplay loading cart for table', tableId, ':', savedCart);
+        if (savedCart) {
+          try {
+            const parsedCart = JSON.parse(savedCart);
+            console.log('MenuDisplay loaded cart:', parsedCart);
+            setCart(parsedCart);
+            setHasLoaded(true);
+          } catch (error) {
+            console.error('Error loading cart from localStorage:', error);
+          }
+        }
+      }
+    };
+
+    loadCart();
+  }, [tableId, isPosMode]);
+
+  // Listen for cart updates from cart pages and window focus
+  useEffect(() => {
+    const handleCartUpdate = (event: CustomEvent) => {
+      const { detail } = event;
+      if (
+        (isPosMode && detail.isPosMode) || 
+        (!isPosMode && detail.tableId === tableId)
+      ) {
+        setCart(detail.cart);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      // Reload cart from localStorage when window gains focus (user comes back from cart page)
+      if (isPosMode) {
+        const savedCart = localStorage.getItem('pos_cart');
+        if (savedCart) {
+          try {
+            setCart(JSON.parse(savedCart));
+          } catch (error) {
+            console.error('Error reloading POS cart from localStorage:', error);
+          }
+        }
+      } else {
+        const savedCart = localStorage.getItem(`cart_table_${tableId}`);
+        if (savedCart) {
+          try {
+            setCart(JSON.parse(savedCart));
+          } catch (error) {
+            console.error('Error reloading cart from localStorage:', error);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate as EventListener);
+    window.addEventListener('focus', handleWindowFocus);
+    
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate as EventListener);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [isPosMode, tableId]);
+
+  // Save cart to localStorage whenever it changes (avoid saving empty initial cart)
+  const [hasLoaded, setHasLoaded] = useState(false);
+  
+  useEffect(() => {
+    console.log('💾 Save effect triggered - hasLoaded:', hasLoaded, 'cart.length:', cart.length, 'cart:', cart);
+    if (hasLoaded || cart.length > 0) {
+      const cartKey = isPosMode ? 'pos_cart' : `cart_table_${tableId}`;
+      console.log('💾 MenuDisplay saving cart to localStorage:', cartKey, cart);
+      localStorage.setItem(cartKey, JSON.stringify(cart));
+      setHasLoaded(true);
+      console.log('💾 Cart saved and hasLoaded set to true');
+    } else {
+      console.log('💾 Not saving cart - conditions not met');
+    }
+  }, [cart, tableId, isPosMode, hasLoaded]);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<FullOrder | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState(true);
@@ -160,18 +255,24 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
   };
 
   const addToCart = (menuItem: MenuItem) => {
+    console.log('🛒 addToCart called with:', menuItem.name, 'Current cart:', cart);
     setCart((prevCart) => {
+      console.log('🛒 Previous cart in addToCart:', prevCart);
       const existingItem = prevCart.find(
         (item) => item.menuItem.id === menuItem.id
       );
+      let newCart;
       if (existingItem) {
-        return prevCart.map((item) =>
+        newCart = prevCart.map((item) =>
           item.menuItem.id === menuItem.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
+      } else {
+        newCart = [...prevCart, { menuItem, quantity: 1 }];
       }
-      return [...prevCart, { menuItem, quantity: 1 }];
+      console.log('🛒 New cart after addToCart:', newCart);
+      return newCart;
     });
     
     if (isPosMode) {
@@ -208,6 +309,12 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
   
   const clearCart = () => {
     setCart([]);
+    // Also clear from localStorage
+    if (isPosMode) {
+      localStorage.removeItem('pos_cart');
+    } else {
+      localStorage.removeItem(`cart_table_${tableId}`);
+    }
   }
 
   const getStatusBadge = (status: Order['status']) => {
@@ -331,7 +438,8 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
             <MobileThemeToggle />
           </div>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="w-full sm:w-auto flex gap-2">
+        
           <CartSheet 
               cart={cart} 
               updateCartQuantity={updateCartQuantity} 

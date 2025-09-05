@@ -28,11 +28,7 @@ export function ImageTestComponent() {
 
   return (
     <div className="flex items-center gap-2">
-      <Button onClick={testImage} variant="outline" size="sm">
-        <ImageIcon className="h-4 w-4 mr-2" />
-        Tester image
-      </Button>
-      
+     
       {imageStatus === 'loading' && (
         <span className="text-sm text-yellow-600">Chargement...</span>
       )}

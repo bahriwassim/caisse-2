@@ -61,7 +61,7 @@ export function AdminLoginDialog({ open, onLogin }: AdminLoginDialogProps) {
             <Input
               id="email"
               type="email"
-              placeholder="contact@startindev.com"
+              placeholder="contact@monresto.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

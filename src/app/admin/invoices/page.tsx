@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { 
   FileText, 
   Mail, 
-  Download, 
+  Printer, 
   Eye, 
   Search, 
   Filter,
@@ -21,6 +21,7 @@ import {
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import { useConditionalRefreshPause } from "@/hooks/use-global-refresh-pause";
+import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
 import { supabase } from "@/lib/supabase";
 import type { FullInvoice, InvoiceStatus } from "@/lib/types";
 import { parseISO } from 'date-fns';
@@ -41,6 +42,7 @@ export default function InvoicesPage() {
   
   const enhancedToast = useEnhancedToast();
   const { pauseWhileActive } = useConditionalRefreshPause();
+  const { details: restaurantDetails } = useRestaurantDetails();
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -191,7 +193,7 @@ export default function InvoicesPage() {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Preuve de paiement - ${invoice.invoice_number}</title>
+        <title>Justificatif de paiement - ${invoice.invoice_number}</title>
         <style>
           @media print {
             @page {
@@ -299,7 +301,7 @@ export default function InvoicesPage() {
       </head>
       <body>
         <div class="ticket-header">
-          <div class="ticket-title">PREUVE DE PAIEMENT</div>
+          <div class="ticket-title">Justificatif de paiement</div>
           <div>Ticket N° ${invoice.invoice_number}</div>
         </div>
         
@@ -388,10 +390,10 @@ export default function InvoicesPage() {
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-4 flex justify-between items-center">
             <h3 className="text-lg font-semibold">Détails Facture {selectedInvoice.invoice_number}</h3>
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="lg" onClick={() => {
               setShowDetails(false);
               pauseWhileActive(false);
-            }}>×</Button>
+            }} className="text-3xl font-bold hover:bg-red-100 dark:hover:bg-red-900/20 h-12 w-12 p-0">×</Button>
           </div>
           
           <div className="p-6 space-y-6">
@@ -497,8 +499,8 @@ export default function InvoicesPage() {
                 className="flex-1"
                 onClick={() => downloadInvoicePDF(selectedInvoice)}
               >
-                <Download className="mr-2 h-4 w-4" />
-                Imprimer PDF
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimer facture
               </Button>
             </div>
           </div>
