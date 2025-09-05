@@ -377,8 +377,8 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Cash Payment Information */}
-                {systemStatus.ordersEnabled && (
+                {/* Cash Payment Information - Only show if cash payment is enabled */}
+                {systemStatus.ordersEnabled && systemStatus.paymentMethods.cash && (
                   <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <div className="flex items-start gap-3">
                       <Coins className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />

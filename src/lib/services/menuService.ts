@@ -91,7 +91,7 @@ export const seedDatabaseIfNeeded = async () => {
                 price: 10,
                 category: "Plats principaux",
                 status: "available",
-                image: "https://picsum.photos/600/400",
+                image: "/images/Pizza-margherita.jpg",
                 aiHint: "margarita pizza"
             },
             {
@@ -100,7 +100,7 @@ export const seedDatabaseIfNeeded = async () => {
                 price: 10,
                 category: "Plats principaux",
                 status: "available",
-                image: "https://picsum.photos/600/400",
+                image: "/images/Pizza-margherita.jpg",
                 aiHint: "chicken pizza"
             },
              {
@@ -109,7 +109,7 @@ export const seedDatabaseIfNeeded = async () => {
                 price: 10,
                 category: "Plats principaux",
                 status: "available",
-                image: "https://picsum.photos/600/400",
+                image: "/images/Pizza-margherita.jpg",
                 aiHint: "regina pizza"
             }
         ];
