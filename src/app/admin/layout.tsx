@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { AdminLoginDialog } from "@/components/auth/AdminLoginDialog";
 import { useActiveOrdersCount } from "@/hooks/use-active-orders-count";
+import FixImagesButton from "@/components/admin/FixImagesButton";
 
 export default function AdminLayout({
   children,
@@ -124,6 +125,9 @@ export default function AdminLayout({
                 <QrCode />
                 <span>Générateur de QR</span>
               </Link>
+              
+              {/* Bouton de correction des images - visible partout */}
+              <FixImagesButton className="border-orange-200 text-orange-700 hover:bg-orange-50" />
               
               <Button
                 variant="ghost"
