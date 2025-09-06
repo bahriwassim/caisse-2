@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { AdminLoginDialog } from "@/components/auth/AdminLoginDialog";
 import { useActiveOrdersCount } from "@/hooks/use-active-orders-count";
-import FixImagesButton from "@/components/admin/FixImagesButton";
 
 export default function AdminLayout({
   children,
@@ -91,7 +90,7 @@ export default function AdminLayout({
             <nav className="flex items-center gap-2">
               <Link href="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <LayoutDashboard />
-                <span>Tableau de bord.</span>
+                <span>Tableau de bord</span>
               </Link>
               <Link href="/admin/pos" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted/10">
                 <ShoppingCart />
@@ -125,9 +124,6 @@ export default function AdminLayout({
                 <QrCode />
                 <span>Générateur de QR</span>
               </Link>
-              
-              {/* Bouton de correction des images - visible partout */}
-              <FixImagesButton className="border-orange-200 text-orange-700 hover:bg-orange-50" />
               
               <Button
                 variant="ghost"

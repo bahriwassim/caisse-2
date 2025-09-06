@@ -154,8 +154,6 @@ function generateInvoiceHTML(invoice: any, order: any, restaurantDetails: any) {
             <thead>
                 <tr>
                     <th>Article</th>
-                    <th>Quantité</th>
-                    <th>Prix unitaire</th>
                     <th>Total</th>
                 </tr>
             </thead>
@@ -163,8 +161,6 @@ function generateInvoiceHTML(invoice: any, order: any, restaurantDetails: any) {
                 ${order.order_items.map((item: any) => `
                     <tr>
                         <td>${item.menu_item?.name || 'Article'}</td>
-                        <td>${item.quantity}</td>
-                        <td>${item.price.toFixed(2)} €</td>
                         <td>${(item.price * item.quantity).toFixed(2)} €</td>
                     </tr>
                 `).join('')}
@@ -175,6 +171,19 @@ function generateInvoiceHTML(invoice: any, order: any, restaurantDetails: any) {
             <p>Sous-total HT: ${invoice.subtotal_ht.toFixed(2)} €</p>
             <p>TVA (${(invoice.tax_rate * 100).toFixed(0)}%): ${invoice.tax_amount.toFixed(2)} €</p>
             <h3>Total TTC: ${invoice.total_ttc.toFixed(2)} €</h3>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
+            <h4>Merci pour votre visite !</h4>
+            ${restaurantDetails?.name ? `
+            <div style="margin-top: 15px; font-size: 0.9em;">
+                <strong>${restaurantDetails.name}</strong><br/>
+                ${restaurantDetails?.address ? `${restaurantDetails.address}<br/>` : ''}
+                ${restaurantDetails?.city && restaurantDetails?.postalCode ? `${restaurantDetails.city} ${restaurantDetails.postalCode}<br/>` : ''}
+                ${restaurantDetails?.phone ? `Tél: ${restaurantDetails.phone}<br/>` : ''}
+                ${restaurantDetails?.email ? `Email: ${restaurantDetails.email}` : ''}
+            </div>
+            ` : ''}
         </div>
     </body>
     </html>

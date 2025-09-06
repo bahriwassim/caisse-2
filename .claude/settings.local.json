@@ -51,7 +51,12 @@
       "Read(/D:\\caisse-2-main\\public\\images/**)",
       "Read(/D:\\caisse-2-main\\src\\app\\admin\\menu-management/**)",
       "Read(/D:\\caisse-2-main\\src\\components\\menu/**)",
-      "Read(/D:\\caisse-2-main\\src\\components\\menu/**)"
+      "Read(/D:\\caisse-2-main\\src\\components\\menu/**)",
+      "Bash(del \"D:\\caisse-2-main\\src\\app\\api\\admin\\fix-images\\route.ts\")",
+      "Bash(del \"D:\\caisse-2-main\\src\\components\\admin\\FixImagesButton.tsx\")",
+      "Bash(del \"D:\\caisse-2-main\\src\\components\\debug\\RestaurantDebug.tsx\")",
+      "Bash(rmdir:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

@@ -333,7 +333,6 @@ export default function InvoicesPage() {
                 <span class="item-name">${item.menu_item?.name || 'Article'}</span>
                 <span class="item-price">${totalItem.toFixed(2)} €</span>
               </div>
-              <div class="quantity-line">${item.quantity}x ${item.price.toFixed(2)} €</div>
             `;
           }).join('')}
         </div>
@@ -359,6 +358,15 @@ export default function InvoicesPage() {
 
         <div class="footer">
           <div><strong>Merci pour votre visite !</strong></div>
+          ${invoice.restaurant_details ? `
+          <div style="margin-top: 10px; text-align: center; border-top: 1px solid #ddd; padding-top: 10px;">
+            <div><strong>${invoice.restaurant_details.name || ''}</strong></div>
+            ${invoice.restaurant_details.address ? `<div>${invoice.restaurant_details.address}</div>` : ''}
+            ${invoice.restaurant_details.city && invoice.restaurant_details.postalCode ? `<div>${invoice.restaurant_details.city} ${invoice.restaurant_details.postalCode}</div>` : ''}
+            ${invoice.restaurant_details.phone ? `<div>Tél: ${invoice.restaurant_details.phone}</div>` : ''}
+            ${invoice.restaurant_details.email ? `<div>Email: ${invoice.restaurant_details.email}</div>` : ''}
+          </div>
+          ` : ''}
           <div style="margin-top: 5px;">Matricule Fiscal: ${FISCAL_NUMBER}</div>
           <div style="margin-top: 5px;">Imprimé le ${new Date().toLocaleString('fr-FR')}</div>
         </div>

@@ -35,10 +35,12 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
     }
     // Priorité : image du produit, sinon image par défaut
     if (item.image) {
-      return item.image;
+      // Ajouter un cache-buster pour forcer le rechargement des images
+      const cacheBuster = `?v=${Date.now()}`;
+      return item.image.includes('http') ? item.image : item.image + cacheBuster;
     }
-    // Images par défaut locales
-    return '/images/Pizza-margherita.jpg';
+    // Images par défaut locales avec cache-buster
+    return `/images/Pizza-margherita.jpg?v=${Date.now()}`;
   };
 
   const imageUrl = getProductImage();
