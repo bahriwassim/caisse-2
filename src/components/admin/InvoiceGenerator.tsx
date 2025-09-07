@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Printer, Calculator, Clock, Eye, CheckCircle } from "lucide-react";
+import { FileText, Printer, Calculator, Clock, Eye, CheckCircle, Mail } from "lucide-react";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
 import type { FullOrder, Invoice } from "@/lib/types";
@@ -196,11 +196,19 @@ export function InvoiceGenerator({ order, onInvoiceGenerated }: InvoiceGenerator
         throw new Error(data.error || 'Erreur lors de l\'envoi');
       }
 
-      enhancedToast.success(
-        "Facture envoyée", 
-        `Facture envoyée avec succès à ${customerEmail}`,
-        { duration: 5000 }
-      );
+      if (data.fallback) {
+        enhancedToast.warning(
+          "Envoi temporairement indisponible", 
+          data.message,
+          { duration: 8000 }
+        );
+      } else {
+        enhancedToast.success(
+          "Facture envoyée", 
+          `Facture envoyée avec succès à ${customerEmail}`,
+          { duration: 5000 }
+        );
+      }
 
       setIsOpen(false);
       setGeneratedInvoice(null);

@@ -21,6 +21,9 @@ export type Database = {
           name: string
           price: number
           status: "available" | "out_of_stock"
+          stock_quantity: number | null
+          min_stock_alert: number | null
+          track_stock: boolean | null
         }
         Insert: {
           aiHint?: string | null
@@ -32,6 +35,9 @@ export type Database = {
           name: string
           price: number
           status?: "available" | "out_of_stock"
+          stock_quantity?: number | null
+          min_stock_alert?: number | null
+          track_stock?: boolean | null
         }
         Update: {
           aiHint?: string | null
@@ -43,6 +49,9 @@ export type Database = {
           name?: string
           price?: number
           status?: "available" | "out_of_stock"
+          stock_quantity?: number | null
+          min_stock_alert?: number | null
+          track_stock?: boolean | null
         }
         Relationships: []
       }

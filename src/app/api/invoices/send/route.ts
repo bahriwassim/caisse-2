@@ -2,135 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import nodemailer from 'nodemailer';
 
-// Configuration de l'envoi d'email avec fallback vers un compte de test
-function createTransporter() {
-  // Mode simulation (aucun email n'est envoyé)
-  if (process.env.EMAIL_MODE === 'simulate') {
-    console.warn('Mode simulation email - aucun email ne sera envoyé');
-    return nodemailer.createTransport({
-      streamTransport: true,
-      newline: 'unix',
-      buffer: true
-    });
-  }
-
-  // Log de la configuration utilisée
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    console.log('✅ Utilisation des variables d\'environnement SMTP (.env.local)');
-  } else {
-    console.log('📧 Utilisation de la configuration SMTP par défaut');
-  }
-
-  // Essayer différentes configurations SMTP
-  const smtpConfigs = [
-    {
-      name: 'Port 587 STARTTLS',
-      config: {
-        host: process.env.SMTP_HOST || 'mail.startindev.fr.fo',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER || 'noreply@startindev.fr.fo',
-          pass: process.env.SMTP_PASS || 'startindev#23',
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        requireTLS: true,
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 10000
-      }
-    },
-    {
-      name: 'Port 465 SSL',
-      config: {
-        host: process.env.SMTP_HOST || 'mail.startindev.fr.fo',
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER || 'noreply@startindev.fr.fo',
-          pass: process.env.SMTP_PASS || 'startindev#23',
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 10000
-      }
-    },
-    {
-      name: 'Port 25 sans sécurité',
-      config: {
-        host: process.env.SMTP_HOST || 'mail.startindev.fr.fo',
-        port: 25,
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER || 'noreply@startindev.fr.fo',
-          pass: process.env.SMTP_PASS || 'startindev#23',
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 10000
-      }
-    }
-  ];
-
-  // Configuration selon la documentation officielle avec variables d'environnement
-  const smtpConfig = {
-    host: process.env.SMTP_HOST || 'mail.startindev.com',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true, // SSL sur port 465
+// Configuration Gmail pour un envoi fiable
+function createGmailTransporter() {
+  return nodemailer.createTransporter({
+    service: 'gmail',
     auth: {
-      user: process.env.SMTP_USER || 'noreply@startindev.com',
-      pass: process.env.SMTP_PASS || 'startindev#23',
+      user: process.env.GMAIL_USER || 'your-email@gmail.com',
+      pass: process.env.GMAIL_APP_PASSWORD || 'your-app-password'
     },
     tls: {
-      rejectUnauthorized: false,
-      servername: process.env.SMTP_HOST || 'mail.startindev.com'
+      rejectUnauthorized: false
+    }
+  });
+}
+
+// Configuration SMTP générique avec gestion d'erreur améliorée
+function createSMTPTransporter() {
+  return nodemailer.createTransporter({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // STARTTLS
+    auth: {
+      user: process.env.SMTP_USER || process.env.GMAIL_USER,
+      pass: process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD
     },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000
-  };
-
-  console.log('📧 Configuration SMTP activée:', {
-    host: smtpConfig.host,
-    port: smtpConfig.port,
-    secure: smtpConfig.secure,
-    user: smtpConfig.auth.user
-  });
-
-  return nodemailer.createTransport(smtpConfig);
-}
-
-// Fonction pour tester une configuration SMTP
-async function testSMTPConnection(config: any, name: string) {
-  return new Promise((resolve) => {
-    const testTransporter = nodemailer.createTransport(config);
-    const timeout = setTimeout(() => {
-      console.log(`❌ Timeout pour ${name}`);
-      resolve(false);
-    }, 8000);
-
-    testTransporter.verify((error, success) => {
-      clearTimeout(timeout);
-      if (error) {
-        console.log(`❌ ${name} échoué:`, error.message);
-        resolve(false);
-      } else {
-        console.log(`✅ ${name} fonctionne!`);
-        resolve(true);
-      }
-    });
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000
   });
 }
-
-let transporter = createTransporter();
 
 export async function POST(req: NextRequest) {
   try {
@@ -142,6 +45,15 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validation email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      return NextResponse.json({ 
+        error: 'Format d\'email invalide' 
+      }, { status: 400 });
+    }
+
+    // Récupérer les données de la facture
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -164,202 +76,114 @@ export async function POST(req: NextRequest) {
     const htmlContent = generateInvoiceHTML(invoice);
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'noreply@startindev.com',
+      from: process.env.SMTP_FROM || process.env.GMAIL_USER || 'noreply@restaurant.com',
       to: recipientEmail,
       subject: `Facture ${invoice.invoice_number} - Restaurant`,
       html: htmlContent,
     };
 
     console.log('📤 Tentative d\'envoi d\'email vers:', recipientEmail);
-    console.log('📧 Configuration SMTP utilisée:', {
-      host: process.env.SMTP_HOST || 'mail.startindev.com',
-      port: process.env.SMTP_PORT || '465',
-      from: process.env.SMTP_FROM || 'noreply@startindev.com'
-    });
     
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      
-      if (process.env.EMAIL_MODE === 'simulate') {
-        console.log('📧 Email simulé avec succès vers:', recipientEmail);
-        console.log('📄 Contenu HTML de la facture généré');
-      } else {
-        console.log('✅ Email envoyé avec succès!');
+    // Essayer d'abord Gmail si configuré
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      try {
+        console.log('🔄 Tentative avec Gmail...');
+        const gmailTransporter = createGmailTransporter();
+        
+        // Test de connexion
+        await gmailTransporter.verify();
+        
+        const info = await gmailTransporter.sendMail(mailOptions);
+        
+        console.log('✅ Email envoyé via Gmail!');
         console.log('📧 Message ID:', info.messageId);
-        console.log('📧 Response:', info.response);
         
-        // En mode test, log l'URL de prévisualisation
-        if (process.env.NODE_ENV === 'development' && info.getTestMessageUrl) {
-          console.log('🔗 URL de prévisualisation:', info.getTestMessageUrl(info));
-        }
+        // Marquer comme envoyé
+        await updateInvoiceStatus(invoiceId, recipientEmail);
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Facture envoyée avec succès via Gmail',
+          messageId: info.messageId
+        });
+        
+      } catch (gmailError: any) {
+        console.log('❌ Gmail échoué:', gmailError.message);
+        // Continuer avec SMTP classique
       }
-    } catch (emailError: any) {
-      console.error('❌ Premier essai échoué:', emailError.message);
+    }
+
+    // Essayer SMTP classique
+    try {
+      console.log('🔄 Tentative avec SMTP...');
+      const smtpTransporter = createSMTPTransporter();
       
-      // Si c'est un problème de connexion, tester d'autres configurations
-      if (emailError.code === 'ETIMEDOUT' || emailError.code === 'ECONNREFUSED') {
-        console.log('🔄 Test d\'autres configurations SMTP...');
-        
-        const smtpConfigs = [
-          {
-            name: 'Port 587 STARTTLS (startindev)',
-            config: {
-              host: 'mail.startindev.com',
-              port: 587,
-              secure: false,
-              requireTLS: true,
-              auth: {
-                user: 'noreply@startindev.com',
-                pass: 'startindev#23',
-              },
-              tls: { 
-                rejectUnauthorized: false,
-                servername: 'mail.startindev.com'
-              },
-              connectionTimeout: 8000,
-              greetingTimeout: 8000,
-              socketTimeout: 8000
-            }
-          },
-          {
-            name: 'Port 465 SSL (documentation officielle)',
-            config: {
-              host: 'mail.startindev.com',
-              port: 465,
-              secure: true,
-              auth: {
-                user: 'noreply@startindev.com',
-                pass: 'startindev#23',
-              },
-              tls: { 
-                rejectUnauthorized: false,
-                servername: 'mail.startindev.com'
-              },
-              connectionTimeout: 8000,
-              greetingTimeout: 8000,
-              socketTimeout: 8000
-            }
-          },
-          {
-            name: 'Port 25 simple (startindev)',
-            config: {
-              host: 'mail.startindev.com',
-              port: 25,
-              secure: false,
-              auth: {
-                user: 'noreply@startindev.com',
-                pass: 'startindev#23',
-              },
-              connectionTimeout: 10000,
-              greetingTimeout: 10000
-            }
-          },
-          {
-            name: 'Gmail SMTP (fallback)',
-            config: {
-              host: 'smtp.gmail.com',
-              port: 587,
-              secure: false,
-              auth: {
-                user: process.env.GMAIL_USER || 'your-email@gmail.com',
-                pass: process.env.GMAIL_PASS || 'your-app-password',
-              },
-              tls: { rejectUnauthorized: false },
-              connectionTimeout: 5000,
-              requireTLS: true
-            }
-          },
-          {
-            name: 'Test Outlook SMTP (vérification réseau)',
-            config: {
-              host: 'smtp-mail.outlook.com',
-              port: 587,
-              secure: false,
-              requireTLS: true,
-              auth: {
-                user: 'test@outlook.com',
-                pass: 'fakepass'
-              },
-              connectionTimeout: 8000,
-              tls: { rejectUnauthorized: false }
-            }
-          }
-        ];
-        
-        // Tester les configurations alternatives
-        for (const smtpTest of smtpConfigs) {
-          try {
-            console.log(`🧪 Test ${smtpTest.name}...`);
-            const altTransporter = nodemailer.createTransport(smtpTest.config);
-            const altInfo = await altTransporter.sendMail(mailOptions);
-            
-            console.log(`✅ Email envoyé avec ${smtpTest.name}!`);
-            console.log('📧 Message ID:', altInfo.messageId);
-            
-            // Succès avec configuration alternative
-            return NextResponse.json({ 
-              success: true, 
-              message: `Facture envoyée avec succès via ${smtpTest.name}` 
-            });
-            
-          } catch (altError: any) {
-            console.log(`❌ ${smtpTest.name} échoué:`, altError.message);
-            continue;
-          }
-        }
-      }
+      // Test de connexion avec timeout
+      const verifyPromise = smtpTransporter.verify();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout de connexion SMTP')), 5000)
+      );
       
-      // Fallback final : simulation avec log du contenu
-      console.log('❌ Toutes les configurations SMTP ont échoué');
-      console.log('🔄 Mode fallback: simulation de l\'envoi avec log du contenu');
+      await Promise.race([verifyPromise, timeoutPromise]);
       
-      const htmlContent = generateInvoiceHTML(invoice);
+      const info = await smtpTransporter.sendMail(mailOptions);
       
-      console.log('📧 === CONTENU EMAIL (SIMULATION) ===');
-      console.log('📧 Destinataire:', recipientEmail);
-      console.log('📧 Sujet:', `Facture ${invoice.invoice_number} - Restaurant`);
-      console.log('📧 Contenu HTML généré et prêt à être envoyé');
-      console.log('📧 === FIN SIMULATION ===');
+      console.log('✅ Email envoyé via SMTP!');
+      console.log('📧 Message ID:', info.messageId);
       
-      // Marquer comme envoyé en mode simulation
+      // Marquer comme envoyé
+      await updateInvoiceStatus(invoiceId, recipientEmail);
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Facture envoyée avec succès',
+        messageId: info.messageId
+      });
+      
+    } catch (smtpError: any) {
+      console.log('❌ SMTP échoué:', smtpError.message);
+      
+      // Mode fallback : sauvegarder pour envoi manuel
+      console.log('🔄 Mode fallback: sauvegarde pour envoi manuel');
+      
+      // Marquer comme "prêt à envoyer" mais pas envoyé
       await supabase
         .from('invoices')
         .update({ 
-          sent_at: new Date().toISOString(),
-          status: 'sent',
-          customer_email: recipientEmail
+          customer_email: recipientEmail,
+          status: 'draft' // Garder en brouillon mais avec email
         })
         .eq('id', invoiceId);
       
       return NextResponse.json({ 
-        success: true, 
-        message: 'Email simulé avec succès (SMTP non disponible)',
-        mode: 'simulation'
-      });
+        success: false,
+        error: 'Serveur d\'email temporairement indisponible',
+        fallback: true,
+        message: 'Facture sauvegardée. Vous pouvez la télécharger ou réessayer l\'envoi plus tard.'
+      }, { status: 202 }); // 202 = Accepted but not processed
     }
 
-    await supabase
-      .from('invoices')
-      .update({ 
-        sent_at: new Date().toISOString(),
-        status: 'sent',
-        customer_email: recipientEmail
-      })
-      .eq('id', invoiceId);
-
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Facture envoyée avec succès' 
-    });
-
   } catch (error: any) {
-    console.error('Erreur envoi facture:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('❌ Erreur générale:', error);
+    return NextResponse.json({ 
+      error: 'Erreur interne du serveur',
+      details: error.message 
+    }, { status: 500 });
   }
 }
 
+async function updateInvoiceStatus(invoiceId: string, email: string) {
+  await supabase
+    .from('invoices')
+    .update({ 
+      sent_at: new Date().toISOString(),
+      status: 'sent',
+      customer_email: email
+    })
+    .eq('id', invoiceId);
+}
+
 function generateInvoiceHTML(invoice: any): string {
-  const restaurantDetails = invoice.restaurant_details;
   const order = invoice.order;
   const items = order.order_items || [];
 
@@ -378,6 +202,7 @@ function generateInvoiceHTML(invoice: any): string {
         .totals { margin-left: auto; width: 300px; }
         .total-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
         .final-total { font-weight: bold; font-size: 1.2em; border-top: 2px solid #333; padding-top: 10px; }
+        .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; }
       </style>
     </head>
     <body>
@@ -440,17 +265,8 @@ function generateInvoiceHTML(invoice: any): string {
         </div>
       </div>
 
-      <div style="margin-top: 50px; font-size: 12px; color: #666;">
+      <div class="footer">
         <p>Merci pour votre visite !</p>
-        ${restaurantDetails?.name ? `
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center;">
-          <strong>${restaurantDetails.name}</strong><br/>
-          ${restaurantDetails?.address ? `${restaurantDetails.address}<br/>` : ''}
-          ${restaurantDetails?.city && restaurantDetails?.postalCode ? `${restaurantDetails.city} ${restaurantDetails.postalCode}<br/>` : ''}
-          ${restaurantDetails?.phone ? `Tél: ${restaurantDetails.phone}<br/>` : ''}
-          ${restaurantDetails?.email ? `Email: ${restaurantDetails.email}` : ''}
-        </div>
-        ` : ''}
         <p>Cette facture a été générée automatiquement.</p>
       </div>
     </body>

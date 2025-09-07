@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { MenuItem } from "@/lib/types";
 import ImageUpload from "./ImageUpload";
 
@@ -20,6 +21,9 @@ const formSchema = z.object({
   status: z.enum(["available", "out_of_stock"]),
   image: z.string().optional(),
   aiHint: z.string().optional(),
+  track_stock: z.boolean().optional(),
+  stock_quantity: z.coerce.number().int().min(0, "La quantité doit être positive.").optional().nullable(),
+  min_stock_alert: z.coerce.number().int().min(0, "Le seuil d'alerte doit être positif.").optional().nullable(),
 });
 
 type MenuItemFormValues = z.infer<typeof formSchema>;
@@ -41,6 +45,9 @@ export default function MenuItemForm({ onSubmit, defaultValues, onCancel }: Menu
       status: defaultValues?.status || "available",
       image: defaultValues?.image || "",
       aiHint: defaultValues?.aiHint || "",
+      track_stock: defaultValues?.track_stock || false,
+      stock_quantity: defaultValues?.stock_quantity || null,
+      min_stock_alert: defaultValues?.min_stock_alert || null,
     },
   });
 
@@ -133,6 +140,81 @@ export default function MenuItemForm({ onSubmit, defaultValues, onCancel }: Menu
             </FormItem>
           )}
         />
+        
+        {/* Section Gestion de Stock */}
+        <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
+          <h3 className="font-medium mb-4">Gestion de Stock</h3>
+          
+          <FormField
+            control={form.control}
+            name="track_stock"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>
+                    Suivre le stock de cet article
+                  </FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Active le décompte automatique du stock lors des commandes
+                  </p>
+                </div>
+              </FormItem>
+            )}
+          />
+          
+          {form.watch("track_stock") && (
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <FormField
+                control={form.control}
+                name="stock_quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantité en stock</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        placeholder="Ex: 50"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="min_stock_alert"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seuil d'alerte stock bas</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        placeholder="Ex: 5"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+        </div>
+        
         <div className="space-y-4">
           <ImageUpload
             currentImageUrl={form.watch("image")}

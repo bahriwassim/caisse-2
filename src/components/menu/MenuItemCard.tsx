@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Star, Clock } from "lucide-react";
+import { PlusCircle, Star, Clock, Package } from "lucide-react";
 import type { MenuItem } from "@/lib/types";
 
 interface MenuItemCardProps {
@@ -128,6 +128,20 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
           {item.spiceLevel && (
             <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
               🌶️ {item.spiceLevel}
+            </Badge>
+          )}
+          {/* Affichage du stock si suivi */}
+          {item.track_stock && item.stock_quantity !== null && (
+            <Badge 
+              variant={
+                item.stock_quantity <= 0 ? "destructive" :
+                item.min_stock_alert && item.stock_quantity <= item.min_stock_alert ? "secondary" :
+                "outline"
+              } 
+              className="text-xs"
+            >
+              <Package className="h-3 w-3 mr-1" />
+              Stock: {item.stock_quantity}
             </Badge>
           )}
         </div>
