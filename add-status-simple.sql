@@ -1,0 +1,1 @@
+ALTER TYPE order_status ADD VALUE 'ready_for_delivery';

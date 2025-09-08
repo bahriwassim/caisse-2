@@ -96,6 +96,8 @@ export default function OrderDetailsPage() {
         return <Badge variant="outline" className="border-orange-500 text-orange-500">En attente de paiement</Badge>;
       case "in_preparation":
         return <Badge variant="default" className="bg-blue-500 text-white">En préparation</Badge>;
+      case "ready_for_delivery":
+        return <Badge variant="outline" className="border-purple-500 text-purple-500">Prête pour livraison</Badge>;
       case "delivered":
         return <Badge className="bg-green-600 text-white">Livrée</Badge>;
       case "cancelled":
@@ -107,8 +109,8 @@ export default function OrderDetailsPage() {
 
   const getPaymentBadge = (method: PaymentMethod) => {
     switch (method) {
-      case "TPE":
-        return <Badge variant="secondary">TPE</Badge>;
+      case "Stripe":
+        return <Badge variant="secondary">Carte</Badge>;
       case "Espèces":
         return <Badge variant="outline">Espèces</Badge>;
       default:
@@ -231,10 +233,19 @@ export default function OrderDetailsPage() {
               )}
               {order.status === 'in_preparation' && (
                 <Button 
+                  onClick={() => handleUpdateStatus('ready_for_delivery')} 
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <Truck className="mr-2 h-4 w-4" />
+                  Prête pour livraison
+                </Button>
+              )}
+              {order.status === 'ready_for_delivery' && (
+                <Button 
                   onClick={() => handleUpdateStatus('delivered')} 
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  <Truck className="mr-2 h-4 w-4" />
+                  <CheckCircle className="mr-2 h-4 w-4" />
                   Marquer comme Livrée
                 </Button>
               )}
@@ -251,7 +262,7 @@ export default function OrderDetailsPage() {
             </div>
 
             {/* Facturation Pro */}
-            {(order.status === 'delivered' || order.status === 'in_preparation') && (
+            {(order.status === 'delivered' || order.status === 'in_preparation' || order.status === 'ready_for_delivery') && (
               <div className="border-t pt-3">
                 <div className="flex items-center justify-center">
                   <InvoiceGenerator order={order} />

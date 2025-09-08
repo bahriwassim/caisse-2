@@ -166,7 +166,7 @@ export type Database = {
           id: string
           payment_method: "Stripe" | "Espèces"
           short_id: string | null
-          status: "awaiting_payment" | "in_preparation" | "delivered" | "cancelled"
+          status: "awaiting_payment" | "in_preparation" | "ready_for_delivery" | "delivered" | "cancelled"
           stripe_session_id: string | null
           table_id: number
           total: number
@@ -177,7 +177,7 @@ export type Database = {
           id?: string
           payment_method: "Stripe" | "Espèces"
           short_id?: string | null
-          status?: "awaiting_payment" | "in_preparation" | "delivered" | "cancelled"
+          status?: "awaiting_payment" | "in_preparation" | "ready_for_delivery" | "delivered" | "cancelled"
           stripe_session_id?: string | null
           table_id: number
           total: number
@@ -186,9 +186,9 @@ export type Database = {
           created_at?: string
           customer?: string
           id?: string
-          payment_method?: "Carte de crédit" | "Espèces"
+          payment_method?: "Stripe" | "Espèces"
           short_id?: string | null
-          status?: "awaiting_payment" | "in_preparation" | "delivered" | "cancelled"
+          status?: "awaiting_payment" | "in_preparation" | "ready_for_delivery" | "delivered" | "cancelled"
           stripe_session_id?: string | null
           table_id?: number
           total?: number

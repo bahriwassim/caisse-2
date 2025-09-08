@@ -323,6 +323,8 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
         return <Badge variant="outline" className="border-orange-500 text-orange-500">En attente de paiement</Badge>;
       case "in_preparation":
         return <Badge variant="default" className="bg-blue-500 text-white">En préparation</Badge>;
+      case "ready_for_delivery":
+        return <Badge variant="outline" className="border-purple-500 text-purple-500">Prête pour livraison</Badge>;
       case "delivered":
         return <Badge className="bg-green-600 text-white">Livrée</Badge>;
       case "cancelled":
@@ -347,6 +349,7 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
     if (!currentOrder) return null;
 
     const isOrderFinished = currentOrder.status === 'delivered' || currentOrder.status === 'cancelled';
+    const isOrderReady = currentOrder.status === 'ready_for_delivery';
 
     return (
         <Card className="mb-8 shadow-lg bg-card/90">
@@ -371,6 +374,20 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
                     <p>Total</p>
                     <p>{currentOrder.total.toFixed(2)} €</p>
                 </div>
+                
+                {isOrderReady && (
+                    <div className="mt-4 text-center p-4 bg-purple-100 dark:bg-purple-900/50 rounded-lg border-2 border-purple-300 dark:border-purple-700">
+                        <div className="mx-auto h-8 w-8 text-purple-600 mb-2 animate-bounce">
+                            🚚
+                        </div>
+                        <p className="font-bold text-purple-700 dark:text-purple-300 text-lg">
+                            🎉 Votre commande est prête !
+                        </p>
+                        <p className="text-purple-600 dark:text-purple-400 mt-1">
+                            Vous pouvez venir la récupérer au comptoir
+                        </p>
+                    </div>
+                )}
                 
                  {isOrderFinished && (
                      <div className="mt-4 text-center p-4 bg-green-100 dark:bg-green-900/50 rounded-lg">

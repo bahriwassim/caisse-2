@@ -23,7 +23,9 @@ import {
   Settings,
   RefreshCw,
   Filter,
-  Search
+  Search,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,6 +34,7 @@ import type { OrderStatus, Order, PaymentMethod, FullOrder, OrderItem } from "@/
 import { supabase } from "@/lib/supabase";
 import { useEnhancedToast } from "@/hooks/use-enhanced-toast";
 import { useGlobalRefreshPause } from "@/hooks/use-global-refresh-pause";
+import { useSoundNotification } from "@/hooks/use-sound-notification";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseISO } from 'date-fns';
 import { InvoiceGenerator } from "@/components/admin/InvoiceGenerator";
@@ -47,12 +50,15 @@ export default function OrdersPage() {
   const enhancedToast = useEnhancedToast();
   const { isPaused: isGlobalRefreshPaused } = useGlobalRefreshPause();
   const notificationsRef = useRef(notificationsEnabled);
+  const { playNotification, requestPermission } = useSoundNotification({ volume: 0.7, playback: notificationsEnabled });
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('disconnected');
   const [eventCount, setEventCount] = useState<number>(0);
   const [lastPayload, setLastPayload] = useState<any>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const [originalTitle, setOriginalTitle] = useState<string>('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchOrders = useCallback(async () => {
@@ -66,7 +72,7 @@ export default function OrdersPage() {
           menu_item:menu_items(*)
         )
       `)
-      .in('status', ['awaiting_payment', 'in_preparation'])
+      .in('status', ['awaiting_payment', 'in_preparation', 'ready_for_delivery'])
       .order('created_at', { ascending: false });
 
     const { data: completed, error: completedError } = await supabase
@@ -139,6 +145,11 @@ export default function OrdersPage() {
               }
             );
             
+            // Sound notification
+            if (soundEnabled) {
+              playNotification('new_order');
+            }
+            
             // Notification native du navigateur si permission accordée
             if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('Nouvelle commande reçue', {
@@ -174,12 +185,14 @@ export default function OrdersPage() {
             const statusMessages: Record<string, string> = {
               awaiting_payment: 'En attente de paiement',
               in_preparation: 'En préparation', 
+              ready_for_delivery: 'Prête pour livraison',
               delivered: 'Livrée',
               cancelled: 'Annulée',
             };
             const statusEmojis: Record<string, string> = {
               awaiting_payment: '⏳',
               in_preparation: '👨‍🍳',
+              ready_for_delivery: '🚚',
               delivered: '✅',
               cancelled: '❌',
             };
@@ -193,6 +206,9 @@ export default function OrdersPage() {
                 duration: 5000,
                 blink: false
               });
+              if (soundEnabled) {
+                playNotification('payment_received');
+              }
             } else if (newRec.status === 'cancelled') {
               enhancedToast.warning(notificationTitle, notificationDesc, {
                 position: 'top-right',
@@ -204,6 +220,9 @@ export default function OrdersPage() {
                 position: 'top-right',
                 duration: 4000
               });
+              if (soundEnabled) {
+                playNotification('order_update');
+              }
             }
           }
           
@@ -266,6 +285,13 @@ export default function OrdersPage() {
   useEffect(() => {
     notificationsRef.current = notificationsEnabled;
   }, [notificationsEnabled]);
+
+  // Request audio permission when sound is first enabled
+  useEffect(() => {
+    if (soundEnabled) {
+      requestPermission();
+    }
+  }, [soundEnabled, requestPermission]);
   
   useEffect(() => {
     if (originalTitle) {
@@ -300,6 +326,13 @@ export default function OrdersPage() {
       return orders;
     }
     return orders.filter(order => order.payment_method === paymentMethodFilter);
+  };
+
+  const filterOrdersByStatus = (orders: FullOrder[]) => {
+    if (statusFilter === 'all') {
+      return orders;
+    }
+    return orders.filter(order => order.status === statusFilter);
   };
 
   const filterOrdersBySearch = (orders: FullOrder[]) => {
@@ -338,6 +371,7 @@ export default function OrdersPage() {
 
   const getFilteredOrders = (orders: FullOrder[]) => {
     let filtered = filterOrdersByPayment(orders);
+    filtered = filterOrdersByStatus(filtered);
     filtered = filterOrdersBySearch(filtered);
     return filtered;
   };
@@ -406,10 +440,21 @@ export default function OrdersPage() {
                     <Button 
                       variant="outline" 
                       size="sm" 
+                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'ready_for_delivery'); }}
+                      className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 text-xs h-7 px-2"
+                    >
+                      <Truck className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Prête</span>
+                    </Button>
+                  )}
+                  {order.status === 'ready_for_delivery' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
                       onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'delivered'); }}
                       className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 text-xs h-7 px-2"
                     >
-                      <Truck className="h-3 w-3 sm:mr-1" />
+                      <CheckCircle className="h-3 w-3 sm:mr-1" />
                       <span className="hidden sm:inline">Livrée</span>
                     </Button>
                   )}
@@ -436,6 +481,8 @@ export default function OrdersPage() {
         return <Badge variant="outline" className="border-orange-500 text-orange-500"><AlertCircle className="mr-1 h-3 w-3"/>En attente de paiement</Badge>;
       case "in_preparation":
         return <Badge variant="default" className="bg-blue-500 text-white"><Clock className="mr-1 h-3 w-3"/>En préparation</Badge>;
+      case "ready_for_delivery":
+        return <Badge variant="outline" className="border-purple-500 text-purple-500"><Truck className="mr-1 h-3 w-3"/>Prête pour livraison</Badge>;
       case "delivered":
         return <Badge className="bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3"/>Livrée</Badge>;
       case "cancelled":
@@ -447,8 +494,8 @@ export default function OrdersPage() {
 
   const getPaymentBadge = (method: PaymentMethod) => {
      switch (method) {
-      case "TPE":
-        return <Badge variant="secondary">TPE</Badge>;
+      case "Stripe":
+        return <Badge variant="secondary">Carte</Badge>;
       case "Espèces":
         return <Badge variant="outline">Espèces</Badge>;
       default:
@@ -517,6 +564,18 @@ export default function OrdersPage() {
                 
                 <div className="flex items-center space-x-2">
                   <Switch
+                    id="sound-notifications"
+                    checked={soundEnabled}
+                    onCheckedChange={setSoundEnabled}
+                  />
+                  <Label htmlFor="sound-notifications" className="flex items-center gap-2 text-sm">
+                    {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    <span className="hidden sm:inline">Sons</span>
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
                     id="auto-refresh"
                     checked={autoRefresh}
                     onCheckedChange={setAutoRefresh}
@@ -568,8 +627,25 @@ export default function OrdersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tous</SelectItem>
-                    <SelectItem value="TPE">TPE</SelectItem>
+                    <SelectItem value="Stripe">Carte</SelectItem>
                     <SelectItem value="Espèces">Espèces</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Label htmlFor="status-filter" className="text-sm font-medium hidden sm:block">
+                  Statut:
+                </Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger id="status-filter" className="w-[120px] sm:w-[150px]">
+                    <SelectValue placeholder="Statut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="awaiting_payment">En attente</SelectItem>
+                    <SelectItem value="in_preparation">Préparation</SelectItem>
+                    <SelectItem value="ready_for_delivery">Prête</SelectItem>
+                    <SelectItem value="delivered">Livrée</SelectItem>
+                    <SelectItem value="cancelled">Annulée</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

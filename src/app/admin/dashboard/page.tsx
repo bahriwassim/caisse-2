@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react";
-import { ClipboardList, DollarSign, Users, Clock, AlertTriangle, TrendingUp, Package, ShoppingCart, Filter } from "lucide-react";
+import { ClipboardList, Euro, Users, Clock, AlertTriangle, TrendingUp, Package, ShoppingCart, Filter } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import type { Order, PaymentMethod } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 import {
     startOfMonth,
     startOfWeek,
@@ -51,9 +53,10 @@ interface DashboardStats {
     totalCustomers: number;
     waitingList: number;
     salesData: { period: string; sales: number; revenue: number }[];
+    productStats: { productName: string; paymentMethod: PaymentMethod; quantity: number; revenue: number }[];
 }
 
-type PeriodFilter = '7days' | '15days' | '30days' | '60days' | 'current_month' | 'last_month' | 'current_quarter' | 'last_quarter' | 'current_year';
+type PeriodFilter = '7days' | '15days' | '30days' | '60days' | 'current_month' | 'last_month' | 'current_quarter' | 'last_quarter' | 'current_year' | 'custom';
 
 export default function Dashboard() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -61,11 +64,12 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [dbError, setDbError] = useState<string | null>(null);
     const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('30days');
+    const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
 
   const getPaymentBadge = (method: PaymentMethod) => {
     switch (method) {
-      case "TPE":
-        return <Badge variant="secondary" className="text-xs">TPE</Badge>;
+      case "Stripe":
+        return <Badge variant="secondary" className="text-xs">Carte</Badge>;
       case "Espèces":
         return <Badge variant="outline" className="text-xs">Espèces</Badge>;
       default:
@@ -73,7 +77,7 @@ export default function Dashboard() {
     }
   };
 
-  const calculatePeriodStats = (orders: Order[], period: PeriodFilter) => {
+  const calculatePeriodStats = (orders: Order[], period: PeriodFilter, customRange?: DateRange) => {
     const now = new Date();
     let startDate: Date;
     let endDate: Date;
@@ -137,6 +141,21 @@ export default function Dashboard() {
         endDate = endOfYear(now);
         periodsToShow = 12;
         periodType = 'month';
+        break;
+      case 'custom':
+        if (customRange?.from && customRange?.to) {
+          startDate = customRange.from;
+          endDate = customRange.to;
+          const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          periodsToShow = Math.min(diffDays, 365);
+          periodType = diffDays > 60 ? 'week' : 'day';
+        } else {
+          startDate = subDays(now, 29);
+          endDate = now;
+          periodsToShow = 30;
+          periodType = 'day';
+        }
         break;
       default:
         startDate = subDays(now, 29);
@@ -212,7 +231,16 @@ export default function Dashboard() {
       try {
         const { data = [], error } = await supabase
           .from('orders')
-          .select('*')
+          .select(`
+            *,
+            order_items (
+              quantity,
+              price,
+              menu_item:menu_items (
+                name
+              )
+            )
+          `)
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -230,16 +258,47 @@ export default function Dashboard() {
         const totalRevenue = fetchedOrders.reduce((sum, o) => o.status !== 'cancelled' ? sum + o.total : sum, 0);
         const totalOrders = fetchedOrders.filter(o => o.status !== 'cancelled').length;
         const totalCustomers = new Set(fetchedOrders.map(o => o.table_id > 0 ? `Table ${o.table_id}`: o.customer)).size;
-        const waitingOrders = fetchedOrders.filter(o => o.status === 'awaiting_payment' || o.status === 'in_preparation').length;
+        const waitingOrders = fetchedOrders.filter(o => o.status === 'awaiting_payment' || o.status === 'in_preparation' || o.status === 'ready_for_delivery').length;
 
-        const salesData = calculatePeriodStats(fetchedOrders, periodFilter);
+        const salesData = calculatePeriodStats(fetchedOrders, periodFilter, customDateRange);
+
+        // Calculate product statistics by payment method
+        const productStatsMap: { [key: string]: { paymentMethod: PaymentMethod; quantity: number; revenue: number } } = {};
+        
+        fetchedOrders.forEach(order => {
+          if (order.status !== 'cancelled' && order.order_items) {
+            order.order_items.forEach((item: any) => {
+              const productName = item.menu_item?.name || 'Produit inconnu';
+              const key = `${productName}-${order.payment_method}`;
+              
+              if (!productStatsMap[key]) {
+                productStatsMap[key] = {
+                  paymentMethod: order.payment_method as PaymentMethod,
+                  quantity: 0,
+                  revenue: 0
+                };
+              }
+              
+              productStatsMap[key].quantity += item.quantity;
+              productStatsMap[key].revenue += item.price * item.quantity;
+            });
+          }
+        });
+
+        const productStats = Object.entries(productStatsMap).map(([key, stats]) => ({
+          productName: key.split('-')[0],
+          paymentMethod: stats.paymentMethod,
+          quantity: stats.quantity,
+          revenue: stats.revenue
+        })).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
 
         setStats({
           totalRevenue,
           totalOrders,
           totalCustomers,
           waitingList: waitingOrders,
-          salesData
+          salesData,
+          productStats
         });
 
       } catch (err) {
@@ -263,7 +322,7 @@ export default function Dashboard() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [periodFilter]);
+    }, [periodFilter, customDateRange]);
 
     if (loading) {
         return (
@@ -325,7 +384,7 @@ export default function Dashboard() {
                 Revenu
               </CardTitle>
               <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                <Euro className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent className="space-y-1 p-3 sm:p-4 pt-0">
@@ -395,7 +454,7 @@ export default function Dashboard() {
         </div>
 
         {/* Filtre de période */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 py-4 px-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-4 py-4 px-2">
           <div className="flex items-center gap-2 justify-center sm:justify-start">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Label htmlFor="period-filter-main" className="text-sm font-medium">
@@ -403,22 +462,33 @@ export default function Dashboard() {
               <span className="sm:hidden">Période:</span>
             </Label>
           </div>
-          <Select value={periodFilter} onValueChange={(value: PeriodFilter) => setPeriodFilter(value)}>
-            <SelectTrigger id="period-filter-main" className="w-full sm:w-[180px] max-w-[200px] mx-auto sm:mx-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7days">7 derniers jours</SelectItem>
-              <SelectItem value="15days">15 derniers jours</SelectItem>
-              <SelectItem value="30days">30 derniers jours</SelectItem>
-              <SelectItem value="60days">60 derniers jours</SelectItem>
-              <SelectItem value="current_month">Mois en cours</SelectItem>
-              <SelectItem value="last_month">Mois dernier</SelectItem>
-              <SelectItem value="current_quarter">Trimestre en cours</SelectItem>
-              <SelectItem value="last_quarter">Dernier trimestre</SelectItem>
-              <SelectItem value="current_year">Année en cours</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <Select value={periodFilter} onValueChange={(value: PeriodFilter) => setPeriodFilter(value)}>
+              <SelectTrigger id="period-filter-main" className="w-full sm:w-[180px] max-w-[200px] mx-auto sm:mx-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7days">7 derniers jours</SelectItem>
+                <SelectItem value="15days">15 derniers jours</SelectItem>
+                <SelectItem value="30days">30 derniers jours</SelectItem>
+                <SelectItem value="60days">60 derniers jours</SelectItem>
+                <SelectItem value="current_month">Mois en cours</SelectItem>
+                <SelectItem value="last_month">Mois dernier</SelectItem>
+                <SelectItem value="current_quarter">Trimestre en cours</SelectItem>
+                <SelectItem value="last_quarter">Dernier trimestre</SelectItem>
+                <SelectItem value="current_year">Année en cours</SelectItem>
+                <SelectItem value="custom">Période personnalisée</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {periodFilter === 'custom' && (
+              <DateRangePicker 
+                date={customDateRange}
+                onDateChange={setCustomDateRange}
+                className="mx-auto sm:mx-0"
+              />
+            )}
+          </div>
         </div>
 
         {/* Charts et Tableaux avec espacement moderne */}
@@ -478,7 +548,7 @@ export default function Dashboard() {
             <CardHeader className="space-y-2 sm:space-y-3 p-4 sm:p-6">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                  <Euro className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
                   <CardTitle className="text-base sm:text-lg">
@@ -562,6 +632,55 @@ export default function Dashboard() {
                         <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{order.total.toFixed(2)} €</TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Product Statistics by Payment Method */}
+        <div className="mt-4 sm:mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="space-y-2 sm:space-y-3 p-4 sm:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <CardTitle className="text-base sm:text-xl">
+                  Statistiques Produits par Moyen de Paiement
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-2 sm:p-3">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b">
+                    <TableHead className="font-semibold text-xs sm:text-sm">Produit</TableHead>
+                    <TableHead className="font-semibold text-xs sm:text-sm">Paiement</TableHead>
+                    <TableHead className="text-right font-semibold text-xs sm:text-sm">Quantité</TableHead>
+                    <TableHead className="text-right font-semibold text-xs sm:text-sm">Revenus</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.productStats.map((stat, index) => (
+                    <TableRow key={`${stat.productName}-${stat.paymentMethod}-${index}`} className={index === stats.productStats.length - 1 ? 'border-b-0' : ''}>
+                      <TableCell className="py-2 sm:py-4">
+                        <div className="font-medium text-xs sm:text-sm">{stat.productName}</div>
+                      </TableCell>
+                      <TableCell className="py-2 sm:py-4">
+                        {getPaymentBadge(stat.paymentMethod)}
+                      </TableCell>
+                      <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{stat.quantity}</TableCell>
+                      <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{stat.revenue.toFixed(2)} €</TableCell>
+                    </TableRow>
+                  ))}
+                  {stats.productStats.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                        Aucune donnée disponible
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
