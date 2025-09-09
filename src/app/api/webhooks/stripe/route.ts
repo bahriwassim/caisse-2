@@ -61,8 +61,58 @@ export async function POST(req: NextRequest) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(`❌ Payment failed for PaymentIntent ${paymentIntent.id}`);
       
-      // Optionnel: marquer la commande comme échouée
-      // Vous pouvez implémenter une logique pour gérer les paiements échoués
+      // Trouver et annuler la commande associée à ce payment intent
+      try {
+        const { data: orders, error: fetchError } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('stripe_payment_intent_id', paymentIntent.id)
+          .eq('status', 'awaiting_payment');
+
+        if (fetchError) {
+          console.error('Error fetching orders for failed payment:', fetchError);
+        } else if (orders && orders.length > 0) {
+          const orderId = orders[0].id;
+          
+          const { error } = await supabase
+            .from('orders')
+            .update({ status: 'cancelled' })
+            .eq('id', orderId);
+
+          if (error) {
+            console.error('Error cancelling order after payment failure:', error);
+          } else {
+            console.log(`✅ Order ${orderId} cancelled due to payment failure`);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing payment failure:', error);
+      }
+      break;
+    }
+
+    case 'checkout.session.expired': {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.orderId;
+      
+      if (orderId) {
+        try {
+          // Annuler la commande si la session de paiement a expiré
+          const { error } = await supabase
+            .from('orders')
+            .update({ status: 'cancelled' })
+            .eq('id', orderId)
+            .eq('status', 'awaiting_payment');
+
+          if (error) {
+            console.error('Error cancelling expired order:', error);
+          } else {
+            console.log(`✅ Order ${orderId} cancelled due to expired checkout session`);
+          }
+        } catch (error) {
+          console.error('Error processing expired session:', error);
+        }
+      }
       break;
     }
     

@@ -54,6 +54,7 @@ interface DashboardStats {
     waitingList: number;
     salesData: { period: string; sales: number; revenue: number }[];
     productStats: { productName: string; paymentMethod: PaymentMethod; quantity: number; revenue: number }[];
+    topProductQuantities: { productName: string; quantity: number }[];
 }
 
 type PeriodFilter = '7days' | '15days' | '30days' | '60days' | 'current_month' | 'last_month' | 'current_quarter' | 'last_quarter' | 'current_year' | 'custom';
@@ -265,23 +266,91 @@ export default function Dashboard() {
         // Calculate product statistics by payment method
         const productStatsMap: { [key: string]: { paymentMethod: PaymentMethod; quantity: number; revenue: number } } = {};
         
+        // Calculate total product quantities for the period
+        const productQuantityMap: { [key: string]: number } = {};
+        
+        // Determine filter dates for products
+        const now = new Date();
+        let filterStartDate: Date;
+        let filterEndDate: Date;
+        
+        switch (periodFilter) {
+          case '7days':
+            filterStartDate = subDays(now, 6);
+            break;
+          case '15days':
+            filterStartDate = subDays(now, 14);
+            break;
+          case '30days':
+            filterStartDate = subDays(now, 29);
+            break;
+          case '60days':
+            filterStartDate = subDays(now, 59);
+            break;
+          case 'current_month':
+            filterStartDate = startOfMonth(now);
+            break;
+          case 'last_month':
+            const lastMonth = subMonths(now, 1);
+            filterStartDate = startOfMonth(lastMonth);
+            filterEndDate = endOfMonth(lastMonth);
+            break;
+          case 'current_quarter':
+            filterStartDate = startOfQuarter(now);
+            break;
+          case 'last_quarter':
+            const lastQuarter = subQuarters(now, 1);
+            filterStartDate = startOfQuarter(lastQuarter);
+            filterEndDate = endOfQuarter(lastQuarter);
+            break;
+          case 'current_year':
+            filterStartDate = startOfYear(now);
+            break;
+          case 'custom':
+            if (customDateRange?.from && customDateRange?.to) {
+              filterStartDate = customDateRange.from;
+              filterEndDate = customDateRange.to;
+            } else {
+              filterStartDate = subDays(now, 29);
+              filterEndDate = now;
+            }
+            break;
+          default:
+            filterStartDate = subDays(now, 29);
+        }
+        
+        if (!filterEndDate) {
+          filterEndDate = now;
+        }
+        
         fetchedOrders.forEach(order => {
-          if (order.status !== 'cancelled' && order.order_items) {
-            order.order_items.forEach((item: any) => {
-              const productName = item.menu_item?.name || 'Produit inconnu';
-              const key = `${productName}-${order.payment_method}`;
-              
-              if (!productStatsMap[key]) {
-                productStatsMap[key] = {
-                  paymentMethod: order.payment_method as PaymentMethod,
-                  quantity: 0,
-                  revenue: 0
-                };
-              }
-              
-              productStatsMap[key].quantity += item.quantity;
-              productStatsMap[key].revenue += item.price * item.quantity;
-            });
+          if (order.status !== 'cancelled' && order.order_items && order.created_at) {
+            const orderDate = parseISO(order.created_at);
+            
+            // Only process orders within the selected period
+            if (orderDate >= filterStartDate && orderDate <= filterEndDate) {
+              order.order_items.forEach((item: any) => {
+                const productName = item.menu_item?.name || 'Produit inconnu';
+                const key = `${productName}-${order.payment_method}`;
+                
+                if (!productStatsMap[key]) {
+                  productStatsMap[key] = {
+                    paymentMethod: order.payment_method as PaymentMethod,
+                    quantity: 0,
+                    revenue: 0
+                  };
+                }
+                
+                productStatsMap[key].quantity += item.quantity;
+                productStatsMap[key].revenue += item.price * item.quantity;
+                
+                // Calculate total quantities per product
+                if (!productQuantityMap[productName]) {
+                  productQuantityMap[productName] = 0;
+                }
+                productQuantityMap[productName] += item.quantity;
+              });
+            }
           }
         });
 
@@ -292,13 +361,20 @@ export default function Dashboard() {
           revenue: stats.revenue
         })).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
 
+        // Product quantities (sorted by quantity)
+        const topProductQuantities = Object.entries(productQuantityMap)
+          .map(([productName, quantity]) => ({ productName, quantity }))
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, 10);
+
         setStats({
           totalRevenue,
           totalOrders,
           totalCustomers,
           waitingList: waitingOrders,
           salesData,
-          productStats
+          productStats,
+          topProductQuantities
         });
 
       } catch (err) {
@@ -392,6 +468,11 @@ export default function Dashboard() {
               <p className="text-xs text-blue-600 dark:text-blue-400">
                 Total généré
               </p>
+              {stats.totalCustomers > 0 && (
+                <p className="text-xs text-blue-500 dark:text-blue-400 font-medium">
+                  {(stats.totalRevenue / stats.totalCustomers).toFixed(2)} €/client
+                </p>
+              )}
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600"></div>
           </Card>
@@ -429,6 +510,11 @@ export default function Dashboard() {
               <p className="text-xs text-purple-600 dark:text-purple-400">
                 Total réalisées
               </p>
+              {stats.totalOrders > 0 && (
+                <p className="text-xs text-purple-500 dark:text-purple-400 font-medium">
+                  {(stats.totalRevenue / stats.totalOrders).toFixed(2)} €/commande
+                </p>
+              )}
             </CardContent>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600"></div>
           </Card>
@@ -600,11 +686,11 @@ export default function Dashboard() {
             <CardHeader className="space-y-2 sm:space-y-3 p-4 sm:p-6">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-secondary/10 rounded-lg">
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-secondary-foreground" />
+                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-secondary-foreground" />
                 </div>
                 <CardTitle className="text-base sm:text-xl">
-                  <span className="hidden sm:inline">Dernières Commandes</span>
-                  <span className="sm:hidden">Récentes</span>
+                  <span className="hidden sm:inline">Produits Commandés</span>
+                  <span className="sm:hidden">Top Produits</span>
                 </CardTitle>
               </div>
             </CardHeader>
@@ -612,26 +698,26 @@ export default function Dashboard() {
                <Table>
                 <TableHeader>
                   <TableRow className="border-b">
-                    <TableHead className="font-semibold text-xs sm:text-sm">Client</TableHead>
-                    <TableHead className="font-semibold text-xs sm:text-sm">Paiement</TableHead>
-                    <TableHead className="text-right font-semibold text-xs sm:text-sm">Montant</TableHead>
+                    <TableHead className="font-semibold text-xs sm:text-sm">Produit</TableHead>
+                    <TableHead className="text-right font-semibold text-xs sm:text-sm">Quantité</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.slice(0, 5).map((order, index) => (
-                    <TableRow key={order.id} className={index === orders.length - 1 ? 'border-b-0' : ''}>
+                  {stats.topProductQuantities?.slice(0, 8).map((item, index) => (
+                    <TableRow key={`${item.productName}-${index}`} className={index === stats.topProductQuantities.slice(0, 8).length - 1 ? 'border-b-0' : ''}>
                         <TableCell className="py-2 sm:py-4">
-                        <div className="font-medium text-xs sm:text-sm">{order.customer}</div>
-                        <div className="text-xs text-muted-foreground">
-                            Table {order.table_id || 'N/A'}
-                        </div>
+                        <div className="font-medium text-xs sm:text-sm">{item.productName}</div>
                         </TableCell>
-                        <TableCell className="py-2 sm:py-4">
-                          {getPaymentBadge(order.payment_method)}
-                        </TableCell>
-                        <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{order.total.toFixed(2)} €</TableCell>
+                        <TableCell className="text-right py-2 sm:py-4 font-semibold text-xs sm:text-sm">{item.quantity}</TableCell>
                     </TableRow>
                   ))}
+                  {(!stats.topProductQuantities || stats.topProductQuantities.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={2} className="text-center py-4 text-muted-foreground">
+                        Aucune donnée disponible
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

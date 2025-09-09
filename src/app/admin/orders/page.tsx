@@ -25,7 +25,9 @@ import {
   Filter,
   Search,
   Volume2,
-  VolumeX
+  VolumeX,
+  BellRing,
+  Euro
 } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -321,6 +323,34 @@ export default function OrdersPage() {
     router.push(`/admin/orders/${order.id}`);
   };
 
+  const handleRingBell = async (order: FullOrder) => {
+    // Notification visuelle
+    enhancedToast.info(
+      `🔔 Sonnerie activée`,
+      `Commande #${order.short_id || order.id.substring(0, 6)} - Table ${order.table_id} - ${order.customer}`,
+      { 
+        position: 'top-right',
+        duration: 3000,
+        blink: true
+      }
+    );
+    
+    // Son de notification
+    if (soundEnabled) {
+      playNotification('order_ready');
+    }
+    
+    // Notification native du navigateur si permission accordée
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Commande prête !', {
+        body: `Table ${order.table_id} - ${order.customer} - Commande #${order.short_id || order.id.substring(0, 6)}`,
+        icon: '/favicon.ico',
+        tag: `ready-${order.id}`,
+        requireInteraction: true
+      });
+    }
+  };
+
   const filterOrdersByPayment = (orders: FullOrder[]) => {
     if (paymentMethodFilter === 'all') {
       return orders;
@@ -432,31 +462,53 @@ export default function OrdersPage() {
                       onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'in_preparation'); }}
                       className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 text-xs h-7 px-2"
                     >
-                      <CircleDollarSign className="h-3 w-3 sm:mr-1" />
+                      <Euro className="h-3 w-3 sm:mr-1" />
                       <span className="hidden sm:inline">Payée</span>
                     </Button>
                   )}
                   {order.status === 'in_preparation' && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'ready_for_delivery'); }}
-                      className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 text-xs h-7 px-2"
-                    >
-                      <Truck className="h-3 w-3 sm:mr-1" />
-                      <span className="hidden sm:inline">Prête</span>
-                    </Button>
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'ready_for_delivery'); }}
+                        className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 text-xs h-7 px-2"
+                      >
+                        <Truck className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Prête</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => { e.stopPropagation(); handleRingBell(order); }}
+                        className="bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-300 text-xs h-7 px-2"
+                      >
+                        <BellRing className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Sonner</span>
+                      </Button>
+                    </>
                   )}
                   {order.status === 'ready_for_delivery' && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'delivered'); }}
-                      className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 text-xs h-7 px-2"
-                    >
-                      <CheckCircle className="h-3 w-3 sm:mr-1" />
-                      <span className="hidden sm:inline">Livrée</span>
-                    </Button>
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order.id, 'delivered'); }}
+                        className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 text-xs h-7 px-2"
+                      >
+                        <CheckCircle className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Livrée</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => { e.stopPropagation(); handleRingBell(order); }}
+                        className="bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-300 text-xs h-7 px-2"
+                      >
+                        <BellRing className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Sonner</span>
+                      </Button>
+                    </>
                   )}
                   <Button 
                     variant="ghost" 

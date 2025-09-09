@@ -112,15 +112,12 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
   const [hasLoaded, setHasLoaded] = useState(false);
   
   useEffect(() => {
-    console.log('💾 Save effect triggered - hasLoaded:', hasLoaded, 'cart.length:', cart.length, 'cart:', cart);
     if (hasLoaded || cart.length > 0) {
       const cartKey = isPosMode ? 'pos_cart' : `cart_table_${tableId}`;
-      console.log('💾 MenuDisplay saving cart to localStorage:', cartKey, cart);
       localStorage.setItem(cartKey, JSON.stringify(cart));
-      setHasLoaded(true);
-      console.log('💾 Cart saved and hasLoaded set to true');
-    } else {
-      console.log('💾 Not saving cart - conditions not met');
+      if (!hasLoaded) {
+        setHasLoaded(true);
+      }
     }
   }, [cart, tableId, isPosMode, hasLoaded]);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
@@ -228,6 +225,33 @@ export default function MenuDisplay({ menu, tableId, isPosMode = false }: MenuDi
     }
 
   }, [currentOrderId, tableId, isRefreshPaused]);
+
+  // Separate effect for payment status checking to avoid infinite loops
+  useEffect(() => {
+    if (!currentOrder || !currentOrderId) return;
+    
+    const checkPaymentStatus = async () => {
+      if (!isRefreshPaused && currentOrder.payment_method === 'Stripe' && currentOrder.status === 'awaiting_payment') {
+        try {
+          await fetch('/api/orders/check-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: currentOrderId })
+          });
+        } catch (error) {
+          console.error('Error checking payment status:', error);
+        }
+      }
+    };
+
+    // Check immediately
+    checkPaymentStatus();
+
+    // Set up interval for payment status checking
+    const paymentCheckInterval = setInterval(checkPaymentStatus, 10000);
+
+    return () => clearInterval(paymentCheckInterval);
+  }, [currentOrder?.payment_method, currentOrder?.status, currentOrderId, isRefreshPaused]);
 
   const handleOrderPlaced = (orderId: string) => {
     localStorage.setItem(`orderId_table_${tableId}`, orderId);
