@@ -20,22 +20,22 @@ interface POSNotificationsProps {
 
 const typeStyles = {
   success: {
-    bg: 'bg-green-500',
+    bg: 'bg-green-500 dark:bg-green-700',
     text: 'text-white',
     icon: <CheckCircle className="h-5 w-5" />,
-    glow: 'shadow-green-500/50'
+    glow: 'shadow-green-500/50 dark:shadow-green-700/50'
   },
   warning: {
-    bg: 'bg-orange-500',
+    bg: 'bg-orange-500 dark:bg-orange-700',
     text: 'text-white',
     icon: <AlertTriangle className="h-5 w-5" />,
-    glow: 'shadow-orange-500/50'
+    glow: 'shadow-orange-500/50 dark:shadow-orange-700/50'
   },
   info: {
-    bg: 'bg-blue-500',
+    bg: 'bg-blue-500 dark:bg-blue-700',
     text: 'text-white',
     icon: <Info className="h-5 w-5" />,
-    glow: 'shadow-blue-500/50'
+    glow: 'shadow-blue-500/50 dark:shadow-blue-700/50'
   }
 };
 

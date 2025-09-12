@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { Utensils } from "lucide-react";
 import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
+import { BellNotificationIndicator } from "@/components/client/BellNotificationIndicator";
+import { useParams } from "next/navigation";
 
 export default function Header() {
   const { details, isLoading } = useRestaurantDetails();
+  const params = useParams();
+  const tableId = params?.tableId ? parseInt(params.tableId as string) : null;
   
   // Debug : loguer les informations
-  console.log('Header - isLoading:', isLoading, 'details:', details);
+  console.log('Header - isLoading:', isLoading, 'details:', details, 'tableId:', tableId);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -51,6 +55,11 @@ export default function Header() {
             </div>
           )}
         </Link>
+        
+        {/* Indicateur de notifications bell si on est sur une page de table */}
+        {tableId && (
+          <BellNotificationIndicator tableId={tableId} />
+        )}
       </div>
     </header>
   );

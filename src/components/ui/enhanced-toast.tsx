@@ -18,38 +18,38 @@ export interface EnhancedToastProps {
 
 const typeStyles = {
   success: {
-    bg: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800',
+    bg: 'bg-green-50 border-green-200 dark:bg-green-800/95 dark:border-green-500',
     icon: '✅',
-    accent: 'bg-green-500',
-    text: 'text-green-800 dark:text-green-200',
+    accent: 'bg-green-500 dark:bg-green-600',
+    text: 'text-green-800 dark:text-green-50',
     sound: 'success'
   },
   error: {
-    bg: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800',
+    bg: 'bg-red-50 border-red-200 dark:bg-red-900/80 dark:border-red-600',
     icon: '❌',
-    accent: 'bg-red-500',
-    text: 'text-red-800 dark:text-red-200',
+    accent: 'bg-red-500 dark:bg-red-600',
+    text: 'text-red-800 dark:text-red-100',
     sound: 'error'
   },
   warning: {
-    bg: 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800',
+    bg: 'bg-orange-50 border-orange-200 dark:bg-orange-900/80 dark:border-orange-600',
     icon: '⚠️',
-    accent: 'bg-orange-500',
-    text: 'text-orange-800 dark:text-orange-200',
+    accent: 'bg-orange-500 dark:bg-orange-600',
+    text: 'text-orange-800 dark:text-orange-100',
     sound: 'warning'
   },
   info: {
-    bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
+    bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/80 dark:border-blue-600',
     icon: 'ℹ️',
-    accent: 'bg-blue-500',
-    text: 'text-blue-800 dark:text-blue-200',
+    accent: 'bg-blue-500 dark:bg-blue-600',
+    text: 'text-blue-800 dark:text-blue-100',
     sound: 'info'
   },
   urgent: {
-    bg: 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800',
+    bg: 'bg-purple-50 border-purple-200 dark:bg-purple-900/80 dark:border-purple-600',
     icon: '🚨',
-    accent: 'bg-purple-500',
-    text: 'text-purple-800 dark:text-purple-200',
+    accent: 'bg-purple-500 dark:bg-purple-600',
+    text: 'text-purple-800 dark:text-purple-100',
     sound: 'urgent'
   }
 };

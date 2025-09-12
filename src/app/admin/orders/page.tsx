@@ -324,30 +324,48 @@ export default function OrdersPage() {
   };
 
   const handleRingBell = async (order: FullOrder) => {
-    // Notification visuelle
-    enhancedToast.info(
-      `🔔 Sonnerie activée`,
-      `Commande #${order.short_id || order.id.substring(0, 6)} - Table ${order.table_id} - ${order.customer}`,
-      { 
-        position: 'top-right',
-        duration: 3000,
-        blink: true
-      }
-    );
-    
-    // Son de notification
-    if (soundEnabled) {
-      playNotification('order_ready');
-    }
-    
-    // Notification native du navigateur si permission accordée
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Commande prête !', {
-        body: `Table ${order.table_id} - ${order.customer} - Commande #${order.short_id || order.id.substring(0, 6)}`,
-        icon: '/favicon.ico',
-        tag: `ready-${order.id}`,
-        requireInteraction: true
+    try {
+      // Envoyer la notification bell au client
+      const response = await fetch('/api/bell-notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: order.id,
+          table_id: order.table_id,
+          message: `🔔 Commande #${order.short_id || order.id.substring(0, 6)} - ${order.customer} - Prête pour livraison !`,
+          admin_user: 'Admin'
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to send bell notification');
+      }
+
+      // Notification visuelle admin
+      enhancedToast.success(
+        `🔔 Sonnerie envoyée`,
+        `Notification envoyée à la Table ${order.table_id} - ${order.customer}`,
+        { 
+          position: 'top-right',
+          duration: 3000,
+          blink: true
+        }
+      );
+      
+      // Son de notification côté admin
+      if (soundEnabled) {
+        playNotification('order_ready');
+      }
+      
+    } catch (error) {
+      console.error('Error sending bell notification:', error);
+      enhancedToast.error(
+        'Erreur de sonnerie',
+        'Impossible d\'envoyer la notification au client',
+        { duration: 3000 }
+      );
     }
   };
 

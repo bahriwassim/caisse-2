@@ -10,7 +10,7 @@ interface SoundNotificationOptions {
 export function useSoundNotification(options: SoundNotificationOptions = {}) {
   const { volume = 0.7, playback = true } = options;
 
-  const playNotification = useCallback(async (type: 'new_order' | 'order_update' | 'payment_received' = 'new_order') => {
+  const playNotification = useCallback(async (type: 'new_order' | 'order_update' | 'payment_received' | 'order_ready' = 'new_order') => {
     if (!playback || typeof window === 'undefined') return;
 
     try {
@@ -37,6 +37,11 @@ export function useSoundNotification(options: SoundNotificationOptions = {}) {
           frequency1 = 1000;
           frequency2 = 1200;
           duration = 200;
+          break;
+        case 'order_ready':
+          frequency1 = 1200;
+          frequency2 = 1400;
+          duration = 400;
           break;
       }
 

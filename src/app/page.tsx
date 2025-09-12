@@ -6,9 +6,13 @@ import { Utensils, QrCode } from "lucide-react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import { useRestaurantDetails } from "@/hooks/use-restaurant-details";
+import { useClientSoundNotifications } from "@/hooks/use-client-sound-notifications";
 
 export default function Home() {
   const { details, isLoading } = useRestaurantDetails();
+  
+  // Activer les notifications sonores côté client
+  useClientSoundNotifications();
 
   return (
     <div className="flex flex-col w-full">

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { ClipboardList, Euro, Users, Clock, AlertTriangle, TrendingUp, Package, ShoppingCart, Filter } from "lucide-react";
 import { MobileThemeToggle } from "@/components/theme/ThemeToggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataExport } from "@/components/admin/DataExport";
+import { useExportNotifications } from "@/hooks/use-export-notifications";
 import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
@@ -66,6 +68,7 @@ export default function Dashboard() {
     const [dbError, setDbError] = useState<string | null>(null);
     const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('30days');
     const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+    const { NotificationContainer } = useExportNotifications();
 
   const getPaymentBadge = (method: PaymentMethod) => {
     switch (method) {
@@ -442,7 +445,9 @@ export default function Dashboard() {
     }
 
   return (
-      <div className="flex flex-1 flex-col space-y-0 p-2 sm:p-4 lg:p-6">
+      <>
+        <NotificationContainer />
+        <div className="flex flex-1 flex-col space-y-0 p-2 sm:p-4 lg:p-6">
         {/* Header avec bouton mode nuit */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
           <div>
@@ -575,6 +580,25 @@ export default function Dashboard() {
               />
             )}
           </div>
+        </div>
+
+        {/* Export des données */}
+        <div className="mb-6">
+          <DataExport 
+            period={periodFilter === 'custom' && customDateRange?.from && customDateRange?.to 
+              ? `${customDateRange.from.toLocaleDateString('fr-FR')} - ${customDateRange.to.toLocaleDateString('fr-FR')}`
+              : periodFilter === '7days' ? '7 derniers jours'
+              : periodFilter === '15days' ? '15 derniers jours'
+              : periodFilter === '30days' ? '30 derniers jours'
+              : periodFilter === '60days' ? '60 derniers jours'
+              : periodFilter === 'current_month' ? 'Mois en cours'
+              : periodFilter === 'last_month' ? 'Mois dernier'
+              : periodFilter === 'current_quarter' ? 'Trimestre en cours'
+              : periodFilter === 'last_quarter' ? 'Dernier trimestre'
+              : periodFilter === 'current_year' ? 'Année en cours'
+              : 'Période sélectionnée'
+            }
+          />
         </div>
 
         {/* Charts et Tableaux avec espacement moderne */}
@@ -772,6 +796,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-      </div>
+        </div>
+      </>
   )
 }

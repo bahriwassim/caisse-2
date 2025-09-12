@@ -30,3 +30,13 @@ export type InvoiceStatus = "draft" | "sent" | "paid";
 export type FullInvoice = Invoice & {
     order: FullOrder;
 };
+
+export interface BellNotification {
+  id: string;
+  created_at: string;
+  order_id: string;
+  table_id: number;
+  message: string;
+  read: boolean;
+  admin_user: string;
+}

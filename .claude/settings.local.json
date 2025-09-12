@@ -57,7 +57,9 @@
       "Bash(del \"D:\\caisse-2-main\\src\\components\\debug\\RestaurantDebug.tsx\")",
       "Bash(rmdir:*)",
       "Bash(rm:*)",
-      "Bash(del \"D:\\caisse-2-main\\src\\app\\api\\invoices\\send\\route.ts\")"
+      "Bash(del \"D:\\caisse-2-main\\src\\app\\api\\invoices\\send\\route.ts\")",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
